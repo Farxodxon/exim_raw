@@ -1,67 +1,89 @@
 import 'dart:convert';
 import 'package:exim_raw/models/raw_material.dart';
+import 'package:exim_raw/models/product.dart';
 import 'package:http/http.dart' as http;
 
 class ApiService {
-  // Render dagi backend URL
   static const String baseUrl = 'https://exim-raw-api.onrender.com';
+  static const _timeout = Duration(seconds: 30);
 
-  /// GET /api/raw-materials
-  Future<List<dynamic>> getRawMaterials() async {
-    final response = await http.get(Uri.parse('$baseUrl/api/raw-materials'));
-    if (response.statusCode == 200) {
-      return jsonDecode(response.body);
-    } else {
-      throw Exception('Failed to load raw materials: ${response.statusCode}');
-    }
-  }
+  Map<String, String> get _headers => {'Content-Type': 'application/json'};
 
-  /// POST /api/raw-materials
-  Future<Map<String, dynamic>> addRawMaterial(Map<String, dynamic> data) async {
-    final response = await http.post(
-      Uri.parse('$baseUrl/api/raw-materials'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode(data),
-    );
-    if (response.statusCode == 200) {
-      return jsonDecode(response.body);
-    } else {
-      throw Exception('Failed to add raw material: ${response.statusCode}');
-    }
-  }
+  // ─── RAW MATERIALS ───────────────────────────────────────────────────────────
 
-  /// GET /health – test uchun
-  Future<Map<String, dynamic>> healthCheck() async {
-    final response = await http.get(Uri.parse('$baseUrl/health'));
-    if (response.statusCode == 200) {
-      return jsonDecode(response.body);
-    } else {
-      throw Exception('Health check failed');
-    }
-  }
-
-  /// GET /api/raw-materials (RawMaterial list)
   Future<List<RawMaterial>> getRawMaterialsList() async {
-    final response = await http.get(Uri.parse('$baseUrl/api/raw-materials'));
-    if (response.statusCode == 200) {
-      final List<dynamic> data = jsonDecode(response.body);
-      return data.map((item) => RawMaterial.fromJson(item)).toList();
-    } else {
-      throw Exception('Failed to load raw materials: ${response.statusCode}');
+    final res = await http.get(Uri.parse('$baseUrl/api/raw-materials')).timeout(_timeout);
+    if (res.statusCode == 200) {
+      return (jsonDecode(res.body) as List).map((e) => RawMaterial.fromJson(e)).toList();
+    }
+    throw Exception('Xato: ${res.statusCode}');
+  }
+
+  // ─── PRODUCTS ────────────────────────────────────────────────────────────────
+
+  Future<List<Product>> getProducts({String search = '', String category = ''}) async {
+    final uri = Uri.parse('$baseUrl/api/products').replace(queryParameters: {
+      if (search.isNotEmpty) 'search': search,
+      if (category.isNotEmpty) 'category': category,
+    });
+    final res = await http.get(uri).timeout(_timeout);
+    if (res.statusCode == 200) {
+      return (jsonDecode(res.body) as List).map((e) => Product.fromJson(e)).toList();
+    }
+    throw Exception('Xato: ${res.statusCode}');
+  }
+
+  Future<List<String>> getCategories() async {
+    final res = await http
+        .get(Uri.parse('$baseUrl/api/products/categories'))
+        .timeout(_timeout);
+    if (res.statusCode == 200) {
+      return List<String>.from(jsonDecode(res.body));
+    }
+    throw Exception('Xato: ${res.statusCode}');
+  }
+
+  Future<Product> createProduct(Map<String, dynamic> data) async {
+    final res = await http.post(
+      Uri.parse('$baseUrl/api/products'),
+      headers: _headers,
+      body: jsonEncode(data),
+    ).timeout(_timeout);
+    if (res.statusCode == 200) return Product.fromJson(jsonDecode(res.body));
+    final err = jsonDecode(res.body)['error'] ?? 'Xato';
+    throw Exception(err);
+  }
+
+  Future<Product> updateProduct(int id, Map<String, dynamic> data) async {
+    final res = await http.put(
+      Uri.parse('$baseUrl/api/products/$id'),
+      headers: _headers,
+      body: jsonEncode(data),
+    ).timeout(_timeout);
+    if (res.statusCode == 200) return Product.fromJson(jsonDecode(res.body));
+    final err = jsonDecode(res.body)['error'] ?? 'Xato';
+    throw Exception(err);
+  }
+
+  Future<void> deleteProduct(int id) async {
+    final res = await http
+        .delete(Uri.parse('$baseUrl/api/products/$id'))
+        .timeout(_timeout);
+    if (res.statusCode != 200) {
+      final err = jsonDecode(res.body)['error'] ?? 'Xato';
+      throw Exception(err);
     }
   }
 
-  /// POST /api/orders/check - shtrix kodlarni tekshirish
+  // ─── ORDERS ──────────────────────────────────────────────────────────────────
+
   Future<Map<String, dynamic>> checkBarcodes(List<String> barcodes) async {
-    final response = await http.post(
+    final res = await http.post(
       Uri.parse('$baseUrl/api/orders/check'),
-      headers: {'Content-Type': 'application/json'},
+      headers: _headers,
       body: jsonEncode({'barcodes': barcodes}),
-    );
-    if (response.statusCode == 200) {
-      return jsonDecode(response.body);
-    } else {
-      throw Exception('Failed to check barcodes: ${response.statusCode}');
-    }
+    ).timeout(_timeout);
+    if (res.statusCode == 200) return jsonDecode(res.body);
+    throw Exception('Xato: ${res.statusCode}');
   }
 }
