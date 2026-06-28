@@ -6,7 +6,6 @@ import 'package:flutter/material.dart';
 
 class ExcelService {
   static Future<File?> pickExcelFile() async {
-    SnackBar(content: Text("call pickExcelFile"));
     final result = await FilePicker.pickFiles(
       type: FileType.custom,
       allowedExtensions: ['xlsx', 'xls', 'csv'],
@@ -16,23 +15,67 @@ class ExcelService {
   }
 
   static Future<List<String>> readBarcodesFromExcel(File file) async {
-    SnackBar(content: Text("call readBarcodesFromExcel"));
     final bytes = await file.readAsBytes();
     final excelFile = excel.Excel.decodeBytes(bytes);
 
-    var sheet = excelFile.tables['заказ-order'];
-    if (sheet == null) {
-      sheet = excelFile.tables.values.first;
-    }
+    // Sheet topamiz: avval "Заказ Eclair-order", keyin "заказ-order", keyin birinchi sheet
+    excel.Sheet? sheet = excelFile.tables['Заказ Eclair-order'] ??
+        excelFile.tables['заказ-order'] ??
+        excelFile.tables.values.first;
 
     final List<String> barcodes = [];
+
     for (var row in sheet.rows) {
-      if (row.length > 5) {
-        final cell = row[5];
-        if (cell != null && cell.value != null) {
-          final value = cell.value.toString().trim();
-          if (value.isNotEmpty && value.length >= 5) {
-            barcodes.add(value);
+      // Format aniqlash: D ustun (index 3) raqam bo'lsa — 3-shablon formati
+      // F ustun (index 5) raqam bo'lsa — 1/2-shablon formati
+
+      String? barcode;
+
+      // 3-shablon: D ustun (index 3) barcode
+      if (row.length > 3) {
+        final cellD = row[3];
+        if (cellD != null && cellD.value != null) {
+          final val = cellD.value.toString().replaceAll('.0', '').trim();
+          if (val.length >= 10 && RegExp(r'^[0-9]+$').hasMatch(val)) {
+            barcode = val;
+          }
+        }
+      }
+
+      // 1/2-shablon: F ustun (index 5) barcode
+      if (barcode == null && row.length > 5) {
+        final cellF = row[5];
+        if (cellF != null && cellF.value != null) {
+          final val = cellF.value.toString().replaceAll('.0', '').trim();
+          if (val.length >= 10 && RegExp(r'^[0-9]+$').hasMatch(val)) {
+            barcode = val;
+          }
+        }
+      }
+
+      if (barcode != null && !barcodes.contains(barcode)) {
+        barcodes.add(barcode);
+      }
+    }
+
+    return barcodes;
+  }
+
+  static Future<List<String>> readBarcodesFromCSV(File file) async {
+    final input = await file.readAsString();
+    final csv = CsvCodec();
+    final rows = csv.decoder.convert(input);
+    final List<String> barcodes = [];
+    for (var row in rows) {
+      // CSV da ham ikki formatni tekshiramiz
+      for (int idx in [3, 5]) {
+        if (row.length > idx) {
+          final value = row[idx]?.toString().replaceAll('.0', '').trim() ?? '';
+          if (value.length >= 10 && RegExp(r'^[0-9]+$').hasMatch(value)) {
+            if (!barcodes.contains(value)) {
+              barcodes.add(value);
+            }
+            break;
           }
         }
       }
@@ -40,26 +83,7 @@ class ExcelService {
     return barcodes;
   }
 
-  static Future<List<String>> readBarcodesFromCSV(File file) async {
-SnackBar(content: Text("call readBarcodesFromCSV"));
-    final input = await file.readAsString();
-    final csv = CsvCodec(); // eski usul
-    final rows = csv.decoder.convert(input);
-    print("rows: $rows");// List<List<dynamic>>
-    final List<String> barcodes = [];
-    for (var row in rows) {
-      if (row.length > 5) {
-        final value = row[5]?.toString().trim() ?? '';
-        if (value.isNotEmpty && value.length >= 5) {
-          barcodes.add(value);
-        }
-      }
-    }
-    return barcodes;
-  }
-
   static Future<List<String>> readBarcodes(File file) async {
-    SnackBar(content: Text("call readBarcodes"));
     final extension = file.path.split('.').last.toLowerCase();
     if (extension == 'csv') {
       return readBarcodesFromCSV(file);
@@ -67,7 +91,7 @@ SnackBar(content: Text("call readBarcodesFromCSV"));
     try {
       return await readBarcodesFromExcel(file);
     } catch (e) {
-      print('Excel o‘qishda xatolik: $e, CSV ga o‘tamiz');
+      print('Excel xatolik: \$e');
       return await readBarcodesFromCSV(file);
     }
   }
