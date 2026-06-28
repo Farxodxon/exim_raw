@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:exim_raw/models/raw_material.dart';
+import 'package:exim_raw/models/order.dart';
 import 'package:exim_raw/models/product.dart';
 import 'package:http/http.dart' as http;
 
@@ -86,4 +87,41 @@ class ApiService {
     if (res.statusCode == 200) return jsonDecode(res.body);
     throw Exception('Xato: ${res.statusCode}');
   }
+
+  // ─── ORDERS ──────────────────────────────────────────────────────────────────
+
+  Future<List<OrderModel>> getOrders() async {
+    final res = await http.get(Uri.parse('$baseUrl/api/orders')).timeout(_timeout);
+    if (res.statusCode == 200) {
+      return (jsonDecode(res.body) as List).map((e) => OrderModel.fromJson(e)).toList();
+    }
+    throw Exception('Xato: ${res.statusCode}');
+  }
+
+  Future<OrderModel> createOrder(Map<String, dynamic> data) async {
+    final res = await http.post(
+      Uri.parse('$baseUrl/api/orders'),
+      headers: _headers,
+      body: jsonEncode(data),
+    ).timeout(_timeout);
+    if (res.statusCode == 200) return OrderModel.fromJson(jsonDecode(res.body));
+    throw Exception(jsonDecode(res.body)['error'] ?? 'Xato');
+  }
+
+  Future<void> saveOrderItems(int orderId, List<Map<String, dynamic>> items) async {
+    final res = await http.post(
+      Uri.parse('$baseUrl/api/orders/$orderId/items'),
+      headers: _headers,
+      body: jsonEncode({'items': items}),
+    ).timeout(_timeout);
+    if (res.statusCode != 200) {
+      throw Exception(jsonDecode(res.body)['error'] ?? 'Xato');
+    }
+  }
+
+  Future<void> deleteOrder(int id) async {
+    final res = await http.delete(Uri.parse('$baseUrl/api/orders/$id')).timeout(_timeout);
+    if (res.statusCode != 200) throw Exception('Xato');
+  }
+
 }
