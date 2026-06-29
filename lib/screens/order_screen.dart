@@ -55,10 +55,9 @@ class _OrderScreenState extends State<OrderScreen> {
                       labelText: 'Davlat *',
                       border: OutlineInputBorder(), isDense: true,
                     ),
-                    value: selectedCountry,
                     items: countries.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
                     onChanged: (v) { setS(() => selectedCountry = v); countryCtrl.text = v ?? ''; },
-                    validator: (_) => selectedCountry == null ? 'Majburiy' : null,
+                    validator: (_) => (selectedCountry == null || selectedCountry!.isEmpty) ? 'Majburiy' : null,
                   ),
                   const SizedBox(height: 12),
                   TextFormField(
