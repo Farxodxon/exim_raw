@@ -31,7 +31,7 @@ class _OrdersHistoryScreenState extends State<OrdersHistoryScreen> {
       if (mounted) {
         setState(() => _isLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Xato: \$e'), backgroundColor: Colors.red),
+          SnackBar(content: Text('Xato: $e'), backgroundColor: Colors.red),
         );
       }
     }
@@ -42,7 +42,7 @@ class _OrdersHistoryScreenState extends State<OrdersHistoryScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text("O'chirish"),
-        content: Text("Buyurtma \${o.orderNumber} ni o'chirmoqchimisiz?"),
+        content: Text("Buyurtma ${o.orderNumber} ni o'chirmoqchimisiz?"),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text("Yo'q")),
           ElevatedButton(
@@ -54,7 +54,7 @@ class _OrdersHistoryScreenState extends State<OrdersHistoryScreen> {
                 _load();
               } catch (e) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Xato: \$e'), backgroundColor: Colors.red),
+                  SnackBar(content: Text('Xato: $e'), backgroundColor: Colors.red),
                 );
               }
             },
@@ -79,7 +79,7 @@ class _OrdersHistoryScreenState extends State<OrdersHistoryScreen> {
       appBar: AppBar(
         backgroundColor: _primary,
         foregroundColor: Colors.white,
-        title: Text('Buyurtmalar tarixi (\${_orders.length})'),
+        title: Text('Buyurtmalar tarixi (${_orders.length})'),
         actions: [
           IconButton(icon: const Icon(Icons.refresh), onPressed: _load),
         ],
@@ -119,24 +119,24 @@ class _OrdersHistoryScreenState extends State<OrdersHistoryScreen> {
                             backgroundColor: _primary.withValues(alpha: 0.1),
                             child: const Icon(Icons.assignment, color: _primary),
                           ),
-                          title: Text('Buyurtma \${o.orderNumber}',
+                          title: Text('Buyurtma ${o.orderNumber}',
                               style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
                           subtitle: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text('\${o.country} · \${o.companyName}',
+                              Text('${o.country} · ${o.companyName}',
                                   style: const TextStyle(fontSize: 12)),
                               if ((o.contractNumber ?? '').isNotEmpty)
-                                Text('Shartnoma: \${o.contractNumber}',
+                                Text('Shartnoma: ${o.contractNumber}',
                                     style: const TextStyle(fontSize: 11, color: Colors.grey)),
                               const SizedBox(height: 4),
                               Row(children: [
-                                _badge('Jami: \$total', Colors.blue),
+                                _badge('Jami: $total', Colors.blue),
                                 const SizedBox(width: 6),
-                                _badge('Topildi: \$found', Colors.green),
+                                _badge('Topildi: $found', Colors.green),
                                 if (total - found > 0) ...[
                                   const SizedBox(width: 6),
-                                  _badge('Topilmadi: \${total - found}', Colors.red),
+                                  _badge('Topilmadi: ${total - found}', Colors.red),
                                 ],
                               ]),
                             ],
@@ -203,7 +203,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       appBar: AppBar(
         backgroundColor: _primary,
         foregroundColor: Colors.white,
-        title: Text(_order != null ? "Buyurtma \${_order!['order_number']}" : "Yuklanmoqda..."),
+        title: Text(_order != null ? "Buyurtma ${_order!['order_number']}" : "Yuklanmoqda..."),
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
@@ -218,10 +218,10 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      Text("Davlat: \${_order!['country']}"),
-                      Text("Firma: \${_order!['company_name']}"),
+                      Text("Davlat: ${_order!['country']}"),
+                      Text("Firma: ${_order!['company_name']}"),
                       if ((_order!['contract_number'] ?? '').toString().isNotEmpty)
-                        Text("Shartnoma: \${_order!['contract_number']}"),
+                        Text("Shartnoma: ${_order!['contract_number']}"),
                     ]),
                   ),
                   Expanded(
