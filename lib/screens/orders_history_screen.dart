@@ -178,6 +178,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   final ApiService _api = ApiService();
   Map<String, dynamic>? _order;
   bool _isLoading = true;
+  bool _hideZeroQty = true;
 
   static const Color _primary = Color(0xFF1565C0);
 
@@ -204,6 +205,13 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         backgroundColor: _primary,
         foregroundColor: Colors.white,
         title: Text(_order != null ? "Buyurtma ${_order!['order_number']}" : "Yuklanmoqda..."),
+        actions: [
+          IconButton(
+            icon: Icon(_hideZeroQty ? Icons.visibility_off : Icons.visibility),
+            tooltip: _hideZeroQty ? "0 miqdorlilarni ko'rsatish" : "0 miqdorlilarni yashirish",
+            onPressed: () => setState(() => _hideZeroQty = !_hideZeroQty),
+          ),
+        ],
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
@@ -225,11 +233,30 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                     ]),
                   ),
                   Expanded(
-                    child: ListView.builder(
+                    child: Builder(builder: (context) {
+                      final allItems = (_order!['items'] as List);
+                      final items = _hideZeroQty
+                          ? allItems.where((it) => (it['quantity'] ?? 0) != 0).toList()
+                          : allItems;
+                      if (items.isEmpty) {
+                        return Center(
+                          child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+                            Icon(Icons.filter_alt_off, size: 50, color: Colors.grey[400]),
+                            const SizedBox(height: 10),
+                            Text("Miqdorli mahsulot yo'q",
+                                style: TextStyle(color: Colors.grey[500])),
+                            TextButton(
+                              onPressed: () => setState(() => _hideZeroQty = false),
+                              child: const Text("Barchasini ko'rsatish"),
+                            ),
+                          ]),
+                        );
+                      }
+                      return ListView.builder(
                       padding: const EdgeInsets.fromLTRB(12, 0, 12, 16),
-                      itemCount: (_order!['items'] as List).length,
+                      itemCount: items.length,
                       itemBuilder: (ctx, i) {
-                        final item = (_order!['items'] as List)[i];
+                        final item = items[i];
                         final found = item['found'] == true;
                         return Container(
                           margin: const EdgeInsets.only(bottom: 5),
@@ -254,7 +281,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                           ),
                         );
                       },
-                    ),
+                      );
+                    }),
                   ),
                 ]),
     );
