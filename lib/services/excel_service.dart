@@ -2,7 +2,12 @@ import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:excel/excel.dart' as excel;
 import 'package:csv/csv.dart';
-import 'package:flutter/material.dart';
+
+class OrderLine {
+  final String barcode;
+  final int quantity;
+  OrderLine({required this.barcode, required this.quantity});
+}
 
 class ExcelService {
   static Future<File?> pickExcelFile() async {
@@ -14,85 +19,110 @@ class ExcelService {
     return File(result.files.single.path!);
   }
 
-  static Future<List<String>> readBarcodesFromExcel(File file) async {
+  static int _parseQty(dynamic raw) {
+    if (raw == null) return 0;
+    final s = raw.toString().replaceAll(',', '.').trim();
+    final d = double.tryParse(s);
+    return d != null ? d.round() : 0;
+  }
+
+  static Future<List<OrderLine>> readOrderLinesFromExcel(File file) async {
     final bytes = await file.readAsBytes();
     final excelFile = excel.Excel.decodeBytes(bytes);
 
-    // Sheet topamiz: avval "Заказ Eclair-order", keyin "заказ-order", keyin birinchi sheet
     excel.Sheet? sheet = excelFile.tables['Заказ Eclair-order'] ??
         excelFile.tables['заказ-order'] ??
         excelFile.tables.values.first;
 
-    final List<String> barcodes = [];
+    final List<OrderLine> lines = [];
+    final Set<String> seen = {};
 
     for (var row in sheet.rows) {
-      // Format aniqlash: D ustun (index 3) raqam bo'lsa — 3-shablon formati
-      // F ustun (index 5) raqam bo'lsa — 1/2-shablon formati
-
       String? barcode;
+      int quantity = 0;
 
-      // 3-shablon: D ustun (index 3) barcode
+      // 3-shablon: barcode=index3, miqdor=index5
       if (row.length > 3) {
         final cellD = row[3];
         if (cellD != null && cellD.value != null) {
           final val = cellD.value.toString().replaceAll('.0', '').trim();
           if (val.length >= 10 && RegExp(r'^[0-9]+$').hasMatch(val)) {
             barcode = val;
+            quantity = row.length > 5 ? _parseQty(row[5]?.value) : 0;
           }
         }
       }
 
-      // 1/2-shablon: F ustun (index 5) barcode
+      // 1/2-shablon: barcode=index5, miqdor=index3
       if (barcode == null && row.length > 5) {
         final cellF = row[5];
         if (cellF != null && cellF.value != null) {
           final val = cellF.value.toString().replaceAll('.0', '').trim();
           if (val.length >= 10 && RegExp(r'^[0-9]+$').hasMatch(val)) {
             barcode = val;
+            quantity = row.length > 3 ? _parseQty(row[3]?.value) : 0;
           }
         }
       }
 
-      if (barcode != null && !barcodes.contains(barcode)) {
-        barcodes.add(barcode);
+      if (barcode != null && !seen.contains(barcode)) {
+        seen.add(barcode);
+        lines.add(OrderLine(barcode: barcode, quantity: quantity));
       }
     }
 
-    return barcodes;
+    return lines;
   }
 
-  static Future<List<String>> readBarcodesFromCSV(File file) async {
+  static Future<List<OrderLine>> readOrderLinesFromCSV(File file) async {
     final input = await file.readAsString();
     final csv = CsvCodec();
     final rows = csv.decoder.convert(input);
-    final List<String> barcodes = [];
+    final List<OrderLine> lines = [];
+    final Set<String> seen = {};
+
     for (var row in rows) {
-      // CSV da ham ikki formatni tekshiramiz
-      for (int idx in [3, 5]) {
-        if (row.length > idx) {
-          final value = row[idx]?.toString().replaceAll('.0', '').trim() ?? '';
-          if (value.length >= 10 && RegExp(r'^[0-9]+$').hasMatch(value)) {
-            if (!barcodes.contains(value)) {
-              barcodes.add(value);
-            }
-            break;
-          }
+      String? barcode;
+      int quantity = 0;
+
+      if (row.length > 3) {
+        final val = row[3]?.toString().replaceAll('.0', '').trim() ?? '';
+        if (val.length >= 10 && RegExp(r'^[0-9]+$').hasMatch(val)) {
+          barcode = val;
+          quantity = row.length > 5 ? _parseQty(row[5]) : 0;
         }
       }
+      if (barcode == null && row.length > 5) {
+        final val = row[5]?.toString().replaceAll('.0', '').trim() ?? '';
+        if (val.length >= 10 && RegExp(r'^[0-9]+$').hasMatch(val)) {
+          barcode = val;
+          quantity = row.length > 3 ? _parseQty(row[3]) : 0;
+        }
+      }
+
+      if (barcode != null && !seen.contains(barcode)) {
+        seen.add(barcode);
+        lines.add(OrderLine(barcode: barcode, quantity: quantity));
+      }
     }
-    return barcodes;
+    return lines;
   }
 
-  static Future<List<String>> readBarcodes(File file) async {
+  static Future<List<OrderLine>> readOrderLines(File file) async {
     final extension = file.path.split('.').last.toLowerCase();
     if (extension == 'csv') {
-      return readBarcodesFromCSV(file);
+      return readOrderLinesFromCSV(file);
     }
     try {
-      return await readBarcodesFromExcel(file);
+      return await readOrderLinesFromExcel(file);
     } catch (e) {
-      print('Excel xatolik: \$e');
-      return await readBarcodesFromCSV(file);
+      return await readOrderLinesFromCSV(file);
     }
+  }
+
+  // Eski metodlar — orqaga moslik uchun (agar boshqa joyda ishlatilsa)
+  static Future<List<String>> readBarcodes(File file) async {
+    final lines = await readOrderLines(file);
+    return lines.map((l) => l.barcode).toList();
   }
 }

@@ -247,6 +247,10 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                                 style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
                             subtitle: Text(item['product_name']?.toString() ?? "Topilmadi",
                                 style: const TextStyle(fontSize: 11), maxLines: 2, overflow: TextOverflow.ellipsis),
+                            trailing: (item['quantity'] != null && item['quantity'] != 0)
+                                ? Text('${item['quantity']} dona',
+                                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.blueGrey))
+                                : null,
                           ),
                         );
                       },

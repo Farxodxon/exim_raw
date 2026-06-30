@@ -131,19 +131,28 @@ class _OrderScreenState extends State<OrderScreen> {
     setState(() { _isLoading = true; _status = "Fayl o'qilmoqda..."; _results = []; });
 
     try {
-      final barcodes = await ExcelService.readBarcodes(file);
+      final orderLines = await ExcelService.readOrderLines(file);
+      final barcodes = orderLines.map((l) => l.barcode).toList();
       setState(() => _status = "${barcodes.length} ta shtrix kod...");
 
       final response = await _api.checkBarcodes(barcodes);
       final results = List<Map<String, dynamic>>.from(response['results']);
 
+      // barcode -> quantity xaritasi
+      final qtyMap = {for (var l in orderLines) l.barcode: l.quantity};
+
       final items = results.map((r) => {
         'barcode': r['barcode'],
         'product_name': r['found'] == true ? ((r['product'] as Map)['name'] ?? '') : '',
-        'quantity': 0,
+        'quantity': qtyMap[r['barcode']] ?? 0,
         'price_usd': r['found'] == true ? (r['product'] as Map)['price_usd'] : null,
         'found': r['found'],
       }).toList();
+
+      // Natijalarga ham miqdorni qo'shamiz (UI uchun)
+      for (var r in results) {
+        r['quantity'] = qtyMap[r['barcode']] ?? 0;
+      }
 
       await _api.saveOrderItems(_currentOrder!.id, items);
 
@@ -273,9 +282,18 @@ class _OrderScreenState extends State<OrderScreen> {
                       style: TextStyle(fontSize: 11, color: found ? Colors.black54 : Colors.red),
                       maxLines: 2, overflow: TextOverflow.ellipsis,
                     ),
-                    trailing: Text(found ? 'OK' : '—',
-                        style: TextStyle(color: found ? Colors.green : Colors.red,
-                            fontWeight: FontWeight.bold, fontSize: 12)),
+                    trailing: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Text(found ? 'OK' : '—',
+                            style: TextStyle(color: found ? Colors.green : Colors.red,
+                                fontWeight: FontWeight.bold, fontSize: 12)),
+                        if ((item['quantity'] ?? 0) > 0)
+                          Text('${item['quantity']} dona',
+                              style: const TextStyle(fontSize: 10, color: Colors.blueGrey)),
+                      ],
+                    ),
                   ),
                 );
               },
