@@ -41,26 +41,26 @@ class ExcelService {
       String? barcode;
       int quantity = 0;
 
-      // 3-shablon: barcode=index3, miqdor=index5
+      // 3-shablon: barcode=index3, miqdor=index5 (Всего штук) yoki E(idx4)*G(idx6)
       if (row.length > 3) {
         final cellD = row[3];
         if (cellD != null && cellD.value != null) {
           final val = cellD.value.toString().replaceAll('.0', '').trim();
           if (val.length >= 10 && RegExp(r'^[0-9]+$').hasMatch(val)) {
             barcode = val;
-            quantity = row.length > 5 ? _parseQty(row[5]?.value) : 0;
+            quantity = _resolveQuantity(row, totalIdx: 5, perBoxIdx: 4, boxesIdx: 6);
           }
         }
       }
 
-      // 1/2-shablon: barcode=index5, miqdor=index3
+      // 1/2-shablon: barcode=index5, miqdor=index3 (Всего штук) yoki idx2*idx4
       if (barcode == null && row.length > 5) {
         final cellF = row[5];
         if (cellF != null && cellF.value != null) {
           final val = cellF.value.toString().replaceAll('.0', '').trim();
           if (val.length >= 10 && RegExp(r'^[0-9]+$').hasMatch(val)) {
             barcode = val;
-            quantity = row.length > 3 ? _parseQty(row[3]?.value) : 0;
+            quantity = _resolveQuantity(row, totalIdx: 3, perBoxIdx: 2, boxesIdx: 4);
           }
         }
       }
@@ -118,6 +118,31 @@ class ExcelService {
     } catch (e) {
       return await readOrderLinesFromCSV(file);
     }
+  }
+
+
+  /// Avval to'g'ridan-to'g'ri raqamli qiymatni o'qishga harakat qiladi.
+  /// Agar formula bo'lsa (masalan "=E2*G2"), kerakli ustunlarni ko'paytirib hisoblaydi.
+  static int _resolveQuantity(List<excel.Data?> row, {
+    required int totalIdx,
+    required int perBoxIdx,
+    required int boxesIdx,
+  }) {
+    if (row.length > totalIdx) {
+      final cell = row[totalIdx];
+      if (cell != null && cell.value != null) {
+        final v = cell.value;
+        // Raqamli qiymat bo'lsa to'g'ridan-to'g'ri ishlatamiz
+        if (v is! excel.FormulaCellValue) {
+          final parsed = _parseQty(v);
+          if (parsed > 0) return parsed;
+        }
+      }
+    }
+    // Formula bo'lsa yoki bo'sh bo'lsa: perBox * boxes orqali hisoblaymiz
+    final perBox = row.length > perBoxIdx ? _parseQty(row[perBoxIdx]?.value) : 0;
+    final boxes = row.length > boxesIdx ? _parseQty(row[boxesIdx]?.value) : 0;
+    return perBox * boxes;
   }
 
   // Eski metodlar — orqaga moslik uchun (agar boshqa joyda ishlatilsa)
