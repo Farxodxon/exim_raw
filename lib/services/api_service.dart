@@ -124,4 +124,11 @@ class ApiService {
     if (res.statusCode != 200) throw Exception('Xato');
   }
 
+
+  Future<Map<String, dynamic>> getOrderDetail(int id) async {
+    final res = await http.get(Uri.parse('$baseUrl/api/orders/$id')).timeout(_timeout);
+    if (res.statusCode == 200) return jsonDecode(res.body);
+    throw Exception('Xato: ${res.statusCode}');
+  }
+
 }

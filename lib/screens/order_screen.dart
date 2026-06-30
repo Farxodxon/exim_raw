@@ -26,6 +26,7 @@ class _OrderScreenState extends State<OrderScreen> {
     final contractCtrl = TextEditingController();
     final formKey = GlobalKey<FormState>();
     String? selectedCountry;
+    bool isSaving = false;
     final countries = ['Россия', 'Казахстан', 'Беларусь', 'Кыргызстан', 'Узбекистан', 'Другой'];
 
     showDialog(
@@ -85,8 +86,9 @@ class _OrderScreenState extends State<OrderScreen> {
             ElevatedButton(
               style: ElevatedButton.styleFrom(
                   backgroundColor: _primary, foregroundColor: Colors.white),
-              onPressed: () async {
+              onPressed: isSaving ? null : () async {
                 if (!formKey.currentState!.validate()) return;
+                setS(() => isSaving = true);
                 try {
                   final order = await _api.createOrder({
                     'order_number': orderNumCtrl.text.trim(),
@@ -102,10 +104,14 @@ class _OrderScreenState extends State<OrderScreen> {
                   });
                   _showMsg('Buyurtma yaratildi: ${order.orderNumber}');
                 } catch (e) {
+                  setS(() => isSaving = false);
                   _showMsg('Xato: $e', isError: true);
                 }
               },
-              child: const Text('Yaratish'),
+              child: isSaving
+                  ? const SizedBox(width: 16, height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                  : const Text('Yaratish'),
             ),
           ],
         ),
