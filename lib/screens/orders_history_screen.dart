@@ -188,6 +188,14 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     _load();
   }
 
+  Widget _statItem(String label, String value) {
+    return Column(children: [
+      Text(value, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: _primary)),
+      const SizedBox(height: 2),
+      Text(label, style: TextStyle(fontSize: 11, color: Colors.grey[600])),
+    ]);
+  }
+
   Future<void> _load() async {
     try {
       final data = await _api.getOrderDetail(widget.orderId);
@@ -219,7 +227,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
               ? const Center(child: Text('Xato yuz berdi'))
               : Column(children: [
                   Container(
-                    margin: const EdgeInsets.all(12),
+                    margin: const EdgeInsets.fromLTRB(12, 12, 12, 6),
                     padding: const EdgeInsets.all(14),
                     decoration: BoxDecoration(
                       color: Colors.white,
@@ -232,6 +240,30 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                         Text("Shartnoma: ${_order!['contract_number']}"),
                     ]),
                   ),
+                  Builder(builder: (context) {
+                    final allItems = (_order!['items'] as List);
+                    final foundItems = allItems.where((it) => it['found'] == true).toList();
+                    final totalTypes = foundItems.length;
+                    final totalQty = foundItems.fold<int>(0, (sum, it) => sum + ((it['quantity'] ?? 0) as num).toInt());
+                    final totalSum = foundItems.fold<double>(0, (sum, it) {
+                      final qty = ((it['quantity'] ?? 0) as num).toDouble();
+                      final price = it['price_usd'] != null ? double.tryParse(it['price_usd'].toString()) ?? 0 : 0.0;
+                      return sum + (qty * price);
+                    });
+                    return Container(
+                      margin: const EdgeInsets.fromLTRB(12, 0, 12, 6),
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: _primary.withValues(alpha: 0.06),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(mainAxisAlignment: MainAxisAlignment.spaceAround, children: [
+                        _statItem('Turlar', '$totalTypes'),
+                        _statItem('Jami dona', '$totalQty'),
+                        _statItem('Summa', '\$${totalSum.toStringAsFixed(2)}'),
+                      ]),
+                    );
+                  }),
                   Expanded(
                     child: Builder(builder: (context) {
                       final allItems = (_order!['items'] as List);
