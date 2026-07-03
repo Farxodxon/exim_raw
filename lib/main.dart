@@ -1,6 +1,7 @@
 import 'package:exim_raw/screens/order_screen.dart';
 import 'package:exim_raw/screens/products_screen.dart';
 import 'package:exim_raw/screens/orders_history_screen.dart';
+import 'package:exim_raw/screens/materials_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 
@@ -40,6 +41,7 @@ class _HomeScreenState extends State<HomeScreen> {
   final List<Widget> _screens = const [
     OrderScreen(),
     OrdersHistoryScreen(),
+    MaterialsScreen(),
     ProductsScreen(),
   ];
 
@@ -60,6 +62,11 @@ class _HomeScreenState extends State<HomeScreen> {
             icon: Icon(Icons.receipt_long_outlined),
             selectedIcon: Icon(Icons.receipt_long),
             label: 'Tarix',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.science_outlined),
+            selectedIcon: Icon(Icons.science),
+            label: 'Siryolar',
           ),
           NavigationDestination(
             icon: Icon(Icons.inventory_2_outlined),

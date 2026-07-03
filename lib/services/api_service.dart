@@ -131,4 +131,84 @@ class ApiService {
     throw Exception('Xato: ${res.statusCode}');
   }
 
+
+  // ─── RAW MATERIALS CATALOG ───────────────────────────────────────────────────
+
+  Future<List<Map<String, dynamic>>> getRawMaterialsCatalog() async {
+    final res = await http.get(Uri.parse('$baseUrl/api/raw-materials-catalog')).timeout(_timeout);
+    if (res.statusCode == 200) return List<Map<String, dynamic>>.from(jsonDecode(res.body));
+    throw Exception('Xato: ${res.statusCode}');
+  }
+
+  Future<Map<String, dynamic>> createRawMaterial(Map<String, dynamic> data) async {
+    final res = await http.post(Uri.parse('$baseUrl/api/raw-materials-catalog'),
+        headers: _headers, body: jsonEncode(data)).timeout(_timeout);
+    if (res.statusCode == 200) return jsonDecode(res.body);
+    throw Exception(jsonDecode(res.body)['error'] ?? 'Xato');
+  }
+
+  Future<void> deleteRawMaterial(int id) async {
+    final res = await http.delete(Uri.parse('$baseUrl/api/raw-materials-catalog/$id')).timeout(_timeout);
+    if (res.statusCode != 200) throw Exception('Xato');
+  }
+
+  // ─── MATERIAL INCOMES ────────────────────────────────────────────────────────
+
+  Future<List<Map<String, dynamic>>> getMaterialIncomes({int? materialId}) async {
+    final uri = Uri.parse('$baseUrl/api/material-incomes').replace(
+        queryParameters: materialId != null ? {'material_id': materialId.toString()} : {});
+    final res = await http.get(uri).timeout(_timeout);
+    if (res.statusCode == 200) return List<Map<String, dynamic>>.from(jsonDecode(res.body));
+    throw Exception('Xato: ${res.statusCode}');
+  }
+
+  Future<Map<String, dynamic>> createMaterialIncome(Map<String, dynamic> data) async {
+    final res = await http.post(Uri.parse('$baseUrl/api/material-incomes'),
+        headers: _headers, body: jsonEncode(data)).timeout(_timeout);
+    if (res.statusCode == 200) return jsonDecode(res.body);
+    throw Exception(jsonDecode(res.body)['error'] ?? 'Xato');
+  }
+
+  Future<void> deleteMaterialIncome(int id) async {
+    final res = await http.delete(Uri.parse('$baseUrl/api/material-incomes/$id')).timeout(_timeout);
+    if (res.statusCode != 200) throw Exception('Xato');
+  }
+
+  // ─── PRODUCT MATERIALS ───────────────────────────────────────────────────────
+
+  Future<List<Map<String, dynamic>>> getProductMaterials(String barcode) async {
+    final res = await http.get(Uri.parse('$baseUrl/api/product-materials/$barcode')).timeout(_timeout);
+    if (res.statusCode == 200) return List<Map<String, dynamic>>.from(jsonDecode(res.body));
+    throw Exception('Xato: ${res.statusCode}');
+  }
+
+  Future<Map<String, dynamic>> createProductMaterial(Map<String, dynamic> data) async {
+    final res = await http.post(Uri.parse('$baseUrl/api/product-materials'),
+        headers: _headers, body: jsonEncode(data)).timeout(_timeout);
+    if (res.statusCode == 200) return jsonDecode(res.body);
+    throw Exception(jsonDecode(res.body)['error'] ?? 'Xato');
+  }
+
+  Future<void> deleteProductMaterial(int id) async {
+    final res = await http.delete(Uri.parse('$baseUrl/api/product-materials/$id')).timeout(_timeout);
+    if (res.statusCode != 200) throw Exception('Xato');
+  }
+
+  // ─── EXPENSES ────────────────────────────────────────────────────────────────
+
+  Future<Map<String, dynamic>> calculateOrderExpenses(int orderId) async {
+    final res = await http.post(Uri.parse('$baseUrl/api/orders/$orderId/calculate-expenses'),
+        headers: _headers).timeout(_timeout);
+    if (res.statusCode == 200) return jsonDecode(res.body);
+    throw Exception(jsonDecode(res.body)['error'] ?? 'Xato');
+  }
+
+  Future<List<Map<String, dynamic>>> getMaterialExpenses({int? materialId}) async {
+    final uri = Uri.parse('$baseUrl/api/material-expenses').replace(
+        queryParameters: materialId != null ? {'material_id': materialId.toString()} : {});
+    final res = await http.get(uri).timeout(_timeout);
+    if (res.statusCode == 200) return List<Map<String, dynamic>>.from(jsonDecode(res.body));
+    throw Exception('Xato: ${res.statusCode}');
+  }
+
 }

@@ -155,6 +155,7 @@ class _OrderScreenState extends State<OrderScreen> {
       }
 
       await _api.saveOrderItems(_currentOrder!.id, items);
+      await _api.calculateOrderExpenses(_currentOrder!.id);
 
       setState(() {
         _results = results;
