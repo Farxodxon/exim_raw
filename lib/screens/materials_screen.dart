@@ -216,12 +216,10 @@ class _MaterialsScreenState extends State<MaterialsScreen>
               subtitle: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 if ((m['code'] ?? '').toString().isNotEmpty)
                   Text('Kod: ${m['code']}', style: const TextStyle(fontSize: 12, color: Colors.grey)),
-                Row(children: [
+                Wrap(spacing: 4, runSpacing: 4, children: [
                   _badge('Kirim: ${income.toStringAsFixed(1)} ${m['unit']}', Colors.green),
-                  const SizedBox(width: 4),
-                  _badge('Rasxod: ${expense.toStringAsFixed(1)}', Colors.orange),
-                  const SizedBox(width: 4),
-                  _badge('Qoldiq: ${balance.toStringAsFixed(1)}', balance < 0 ? Colors.red : Colors.blue),
+                  _badge('Rasxod: ${expense.toStringAsFixed(1)} ${m['unit']}', Colors.orange),
+                  _badge('Qoldiq: ${balance.toStringAsFixed(1)} ${m['unit']}', balance < 0 ? Colors.red : Colors.blue),
                 ]),
               ]),
               isThreeLine: true,
