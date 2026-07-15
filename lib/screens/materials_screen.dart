@@ -316,11 +316,18 @@ class _MaterialDetailScreenState extends State<MaterialDetailScreen> {
     _load();
   }
 
+  List<Map<String, dynamic>> _linkedProducts = [];
+
   Future<void> _load() async {
     setState(() => _loading = true);
     try {
       final data = await _api.getMaterialExpenses(materialId: widget.material['id'] as int);
-      if (mounted) setState(() { _expenses = data; _loading = false; });
+      final linked = await _api.getProductMaterialsByMaterial(widget.material['id'] as int);
+      if (mounted) setState(() {
+        _expenses = data;
+        _linkedProducts = linked;
+        _loading = false;
+      });
     } catch (e) {
       if (mounted) setState(() => _loading = false);
     }
@@ -329,49 +336,75 @@ class _MaterialDetailScreenState extends State<MaterialDetailScreen> {
   void _addProductLink() {
     final barcodeCtrl = TextEditingController();
     final gramsCtrl = TextEditingController();
+    final dateCtrl = TextEditingController();
+    bool isActive = true;
     final formKey = GlobalKey<FormState>();
-    showDialog(context: context, builder: (ctx) => AlertDialog(
-      title: const Text('Mahsulot biriktirish', style: TextStyle(fontWeight: FontWeight.bold)),
-      content: Form(key: formKey, child: Column(mainAxisSize: MainAxisSize.min, children: [
-        TextFormField(controller: barcodeCtrl, decoration: const InputDecoration(
-          labelText: 'Mahsulot barkodi *', border: OutlineInputBorder(), isDense: true),
-          keyboardType: TextInputType.number,
-          validator: (v) => v == null || v.isEmpty ? 'Majburiy' : null),
-        const SizedBox(height: 12),
-        TextFormField(controller: gramsCtrl, decoration: const InputDecoration(
-          labelText: '1 dona uchun necha gram *', border: OutlineInputBorder(), isDense: true,
-          suffixText: 'g'),
-          keyboardType: TextInputType.number,
-          validator: (v) => v == null || v.isEmpty ? 'Majburiy' : null),
-      ])),
-      actions: [
-        TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Bekor')),
-        ElevatedButton(
-          style: ElevatedButton.styleFrom(backgroundColor: _primary, foregroundColor: Colors.white),
-          onPressed: () async {
-            if (!formKey.currentState!.validate()) return;
-            try {
-              await _api.createProductMaterial({
-                'product_barcode': barcodeCtrl.text.trim(),
-                'raw_material_id': widget.material['id'],
-                'grams_per_unit': double.parse(gramsCtrl.text),
-              });
-              if (ctx.mounted) Navigator.pop(ctx);
-              if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Biriktirildi'), backgroundColor: Colors.green));
+
+    showDialog(context: context, builder: (ctx) => StatefulBuilder(
+      builder: (ctx, setS) => AlertDialog(
+        title: const Text('Mahsulot biriktirish', style: TextStyle(fontWeight: FontWeight.bold)),
+        content: SizedBox(width: 400, child: Form(key: formKey, child: SingleChildScrollView(
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            TextFormField(controller: barcodeCtrl, decoration: const InputDecoration(
+              labelText: 'Mahsulot barkodi *', border: OutlineInputBorder(), isDense: true),
+              keyboardType: TextInputType.number,
+              validator: (v) => v == null || v.isEmpty ? 'Majburiy' : null),
+            const SizedBox(height: 12),
+            TextFormField(controller: gramsCtrl, decoration: const InputDecoration(
+              labelText: '1 dona uchun necha gram *', border: OutlineInputBorder(),
+              isDense: true, suffixText: 'g'),
+              keyboardType: TextInputType.number,
+              validator: (v) => v == null || v.isEmpty ? 'Majburiy' : null),
+            const SizedBox(height: 12),
+            TextFormField(controller: dateCtrl, decoration: const InputDecoration(
+              labelText: 'Rasxod boshlanish sanasi (YYYY-MM-DD)',
+              border: OutlineInputBorder(), isDense: true,
+              hintText: 'masalan: 2026-03-01'),
+            ),
+            const SizedBox(height: 12),
+            SwitchListTile(
+              title: const Text('Faol', style: TextStyle(fontSize: 14)),
+              subtitle: Text(isActive ? 'Rasxod hisoblanadi' : 'Rasxod hisoblanmaydi',
+                  style: const TextStyle(fontSize: 12)),
+              value: isActive,
+              onChanged: (v) => setS(() => isActive = v),
+              contentPadding: EdgeInsets.zero,
+              dense: true,
+            ),
+          ]),
+        ))),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Bekor')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: _primary, foregroundColor: Colors.white),
+            onPressed: () async {
+              if (!formKey.currentState!.validate()) return;
+              try {
+                await _api.createProductMaterial({
+                  'product_barcode': barcodeCtrl.text.trim(),
+                  'raw_material_id': widget.material['id'],
+                  'grams_per_unit': double.parse(gramsCtrl.text),
+                  'is_active': isActive,
+                  'active_from': dateCtrl.text.trim().isEmpty ? null : dateCtrl.text.trim(),
+                });
+                if (ctx.mounted) Navigator.pop(ctx);
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Biriktirildi'), backgroundColor: Colors.green));
+                }
+              } catch (e) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Xato: $e'), backgroundColor: Colors.red));
+                }
               }
-            } catch (e) {
-              if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Xato: $e'), backgroundColor: Colors.red));
-              }
-            }
-          },
-          child: const Text('Biriktirish')),
-      ],
+            },
+            child: const Text('Biriktirish')),
+        ],
+      ),
     ));
   }
+
 
   @override
   Widget build(BuildContext context) {
@@ -406,8 +439,56 @@ class _MaterialDetailScreenState extends State<MaterialDetailScreen> {
             ]),
           ]),
         ),
+        // Biriktirilgan mahsulotlar
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+          child: Row(children: [
+            const Text('Biriktirilgan mahsulotlar', style: TextStyle(fontWeight: FontWeight.bold)),
+            const Spacer(),
+            Text('${_linkedProducts.length} ta', style: TextStyle(color: Colors.grey[600], fontSize: 12)),
+          ]),
+        ),
+        if (_linkedProducts.isNotEmpty)
+          SizedBox(
+            height: 120,
+            child: ListView.builder(
+              padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+              scrollDirection: Axis.horizontal,
+              itemCount: _linkedProducts.length,
+              itemBuilder: (ctx, i) {
+                final p = _linkedProducts[i];
+                final active = p['is_active'] == true;
+                return Container(
+                  width: 180,
+                  margin: const EdgeInsets.only(right: 8),
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: active ? Colors.white : Colors.grey[100],
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: active ? Colors.green.withValues(alpha: 0.4) : Colors.grey.withValues(alpha: 0.3)),
+                  ),
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Row(children: [
+                      Icon(active ? Icons.check_circle : Icons.pause_circle,
+                          size: 14, color: active ? Colors.green : Colors.grey),
+                      const SizedBox(width: 4),
+                      Expanded(child: Text(p['product_barcode'] ?? '', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold), overflow: TextOverflow.ellipsis)),
+                    ]),
+                    const SizedBox(height: 4),
+                    Text(p['product_name'] ?? "Noma'lum", style: const TextStyle(fontSize: 10, color: Colors.blueGrey), maxLines: 2, overflow: TextOverflow.ellipsis),
+                    const Spacer(),
+                    Text('${p['grams_per_unit']} g/dona', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF1565C0))),
+                    if (p['active_from'] != null)
+                      Text('${p['active_from'].toString().substring(0, 10)} dan', style: const TextStyle(fontSize: 9, color: Colors.grey)),
+                  ]),
+                );
+              },
+            ),
+          ),
+        const Divider(height: 1),
+        // Rasxod tarixi
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
           child: Row(children: [
             const Text('Rasxod tarixi', style: TextStyle(fontWeight: FontWeight.bold)),
             const Spacer(),
@@ -434,11 +515,11 @@ class _MaterialDetailScreenState extends State<MaterialDetailScreen> {
                           child: ListTile(
                             dense: true,
                             leading: const Icon(Icons.arrow_upward, color: Colors.orange, size: 20),
-                            title: Text('Buyurtma: ${e['order_number'] ?? '-'}',
+                            title: Text("Buyurtma: ${e['order_number'] ?? '-'}",
                                 style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-                            subtitle: Text('Barcode: ${e['product_barcode']}',
+                            subtitle: Text("Barcode: ${e['product_barcode']}",
                                 style: const TextStyle(fontSize: 11)),
-                            trailing: Text('${e['quantity_kg']} kg',
+                            trailing: Text("${e['quantity_kg']} kg",
                                 style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.orange)),
                           ),
                         );

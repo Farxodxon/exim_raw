@@ -182,6 +182,28 @@ class ApiService {
     throw Exception('Xato: ${res.statusCode}');
   }
 
+  Future<List<Map<String, dynamic>>> getProductMaterialsByMaterial(int materialId) async {
+    final res = await http.get(Uri.parse('$baseUrl/api/product-materials-by-material/$materialId')).timeout(_timeout);
+    if (res.statusCode == 200) return List<Map<String, dynamic>>.from(jsonDecode(res.body));
+    throw Exception('Xato: ${res.statusCode}');
+  }
+
+  Future<Map<String, dynamic>> getOrderExpenseReport(int orderId) async {
+    final res = await http.get(Uri.parse('$baseUrl/api/orders/$orderId/expense-report')).timeout(_timeout);
+    if (res.statusCode == 200) return jsonDecode(res.body);
+    throw Exception('Xato: ${res.statusCode}');
+  }
+
+  Future<Map<String, dynamic>> calculateOrderExpensesWithDate(int orderId, {String? expenseDate}) async {
+    final res = await http.post(
+      Uri.parse('$baseUrl/api/orders/$orderId/calculate-expenses'),
+      headers: _headers,
+      body: jsonEncode(expenseDate != null ? {'expense_date': expenseDate} : {}),
+    ).timeout(_timeout);
+    if (res.statusCode == 200) return jsonDecode(res.body);
+    throw Exception(jsonDecode(res.body)['error'] ?? 'Xato');
+  }
+
   Future<Map<String, dynamic>> createProductMaterial(Map<String, dynamic> data) async {
     final res = await http.post(Uri.parse('$baseUrl/api/product-materials'),
         headers: _headers, body: jsonEncode(data)).timeout(_timeout);
