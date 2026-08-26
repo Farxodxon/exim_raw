@@ -1,7 +1,12 @@
 import 'dart:convert';
 import 'package:exim_raw/models/raw_material.dart';
 import 'package:exim_raw/models/order.dart';
+import 'package:exim_raw/models/dalolatnoma.dart';
+import 'package:exim_raw/models/partner.dart';
 import 'package:exim_raw/models/product.dart';
+import 'package:exim_raw/models/product_category.dart';
+import 'package:exim_raw/models/tir_data.dart';
+import 'package:exim_raw/models/invoice_data.dart';
 import 'package:http/http.dart' as http;
 
 class ApiService {
@@ -22,10 +27,11 @@ class ApiService {
 
   // ─── PRODUCTS ────────────────────────────────────────────────────────────────
 
-  Future<List<Product>> getProducts({String search = '', String category = ''}) async {
+  Future<List<Product>> getProducts({String search = '', int? categoryId, int? mainCategoryId}) async {
     final uri = Uri.parse('$baseUrl/api/products').replace(queryParameters: {
       if (search.isNotEmpty) 'search': search,
-      if (category.isNotEmpty) 'category': category,
+      if (categoryId != null) 'category_id': categoryId.toString(),
+      if (mainCategoryId != null) 'main_category_id': mainCategoryId.toString(),
     });
     final res = await http.get(uri).timeout(_timeout);
     if (res.statusCode == 200) {
@@ -34,12 +40,14 @@ class ApiService {
     throw Exception('Xato: ${res.statusCode}');
   }
 
-  Future<List<String>> getCategories() async {
+  Future<List<ProductCategory>> getCategoryTree() async {
     final res = await http
         .get(Uri.parse('$baseUrl/api/products/categories'))
         .timeout(_timeout);
     if (res.statusCode == 200) {
-      return List<String>.from(jsonDecode(res.body));
+      return (jsonDecode(res.body) as List)
+          .map((e) => ProductCategory.fromJson(e as Map<String, dynamic>))
+          .toList();
     }
     throw Exception('Xato: ${res.statusCode}');
   }
@@ -129,6 +137,67 @@ class ApiService {
     final res = await http.get(Uri.parse('$baseUrl/api/orders/$id')).timeout(_timeout);
     if (res.statusCode == 200) return jsonDecode(res.body);
     throw Exception('Xato: ${res.statusCode}');
+  }
+
+  Future<DalolatnomaData> getDalolatnomaData(int orderId) async {
+    final res = await http.get(Uri.parse('$baseUrl/api/orders/$orderId/dalolatnoma-data')).timeout(_timeout);
+    if (res.statusCode == 200) return DalolatnomaData.fromJson(jsonDecode(res.body));
+    throw Exception(jsonDecode(res.body)['error'] ?? 'Xato: ${res.statusCode}');
+  }
+
+  Future<TirData> getTirData(int orderId) async {
+    final res = await http
+        .get(Uri.parse('$baseUrl/api/orders/$orderId/tir-data'))
+        .timeout(_timeout);
+    if (res.statusCode == 200) {
+      return TirData.fromJson(jsonDecode(res.body) as Map<String, dynamic>);
+    }
+    throw Exception('Xato: ${res.statusCode}');
+  }
+
+  Future<InvoiceData> getInvoiceData(int orderId) async {
+    final res = await http
+        .get(Uri.parse('$baseUrl/api/orders/$orderId/invoice-data'))
+        .timeout(_timeout);
+    if (res.statusCode == 200) {
+      return InvoiceData.fromJson(jsonDecode(res.body) as Map<String, dynamic>);
+    }
+    throw Exception('Xato: ${res.statusCode}');
+  }
+
+  // ─── PARTNERS ─────────────────────────────────────────────────────────────
+
+  Future<List<PartnerModel>> getPartners() async {
+    final res = await http.get(Uri.parse('$baseUrl/api/partners')).timeout(_timeout);
+    if (res.statusCode == 200) {
+      return (jsonDecode(res.body) as List).map((e) => PartnerModel.fromJson(e)).toList();
+    }
+    throw Exception('Xato: ${res.statusCode}');
+  }
+
+  Future<PartnerModel> createPartner(Map<String, dynamic> data) async {
+    final res = await http.post(
+      Uri.parse('$baseUrl/api/partners'),
+      headers: _headers,
+      body: jsonEncode(data),
+    ).timeout(_timeout);
+    if (res.statusCode == 200) return PartnerModel.fromJson(jsonDecode(res.body));
+    throw Exception(jsonDecode(res.body)['error'] ?? 'Xato');
+  }
+
+  Future<PartnerModel> updatePartner(int id, Map<String, dynamic> data) async {
+    final res = await http.put(
+      Uri.parse('$baseUrl/api/partners/$id'),
+      headers: _headers,
+      body: jsonEncode(data),
+    ).timeout(_timeout);
+    if (res.statusCode == 200) return PartnerModel.fromJson(jsonDecode(res.body));
+    throw Exception(jsonDecode(res.body)['error'] ?? 'Xato');
+  }
+
+  Future<void> deletePartner(int id) async {
+    final res = await http.delete(Uri.parse('$baseUrl/api/partners/$id')).timeout(_timeout);
+    if (res.statusCode != 200) throw Exception('Xato');
   }
 
 

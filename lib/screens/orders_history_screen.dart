@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models/order.dart';
+import 'combined_documents_screen.dart';
 import '../services/api_service.dart';
 
 class OrdersHistoryScreen extends StatefulWidget {
@@ -57,8 +58,9 @@ class _OrdersHistoryScreenState extends State<OrdersHistoryScreen> {
 
   void _showCalculateDialog(OrderModel o) {
     String defaultDate = '';
-    if (o.createdAt != null && o.createdAt!.length >= 10) {
-      defaultDate = o.createdAt!.substring(0, 10);
+    final refDate = o.orderDate ?? o.createdAt;
+    if (refDate != null && refDate.length >= 10) {
+      defaultDate = refDate.substring(0, 10);
     } else {
       defaultDate = DateTime.now().toIso8601String().substring(0, 10);
     }
@@ -169,8 +171,9 @@ class _OrdersHistoryScreenState extends State<OrdersHistoryScreen> {
                       final o = _orders[i];
                       final total = o.totalItems ?? 0;
                       final found = o.foundItems ?? 0;
-                      final dateStr = (o.createdAt != null && o.createdAt!.length >= 10)
-                          ? o.createdAt!.substring(0, 10) : '';
+                      final orderRefDate = o.orderDate ?? o.createdAt;
+                      final dateStr = (orderRefDate != null && orderRefDate.length >= 10)
+                          ? orderRefDate.substring(0, 10) : '';
                       return Container(
                         margin: const EdgeInsets.only(bottom: 8),
                         decoration: BoxDecoration(
@@ -187,10 +190,10 @@ class _OrdersHistoryScreenState extends State<OrdersHistoryScreen> {
                             title: Text('Buyurtma ${o.orderNumber}',
                                 style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
                             subtitle: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                              Text('${o.country} · ${o.companyName}',
+                              Text('${o.davlati ?? '-'} · ${o.firmaNomi ?? '-'}',
                                   style: const TextStyle(fontSize: 12)),
-                              if ((o.contractNumber ?? '').isNotEmpty)
-                                Text('Shartnoma: ${o.contractNumber}',
+                              if ((o.certificationNumber ?? '').isNotEmpty)
+                                Text('Sertifikat: ${o.certificationNumber}',
                                     style: const TextStyle(fontSize: 11, color: Colors.grey)),
                               if (dateStr.isNotEmpty)
                                 Text('Sana: $dateStr',
@@ -218,6 +221,22 @@ class _OrdersHistoryScreenState extends State<OrdersHistoryScreen> {
                                   label: const Text('Rasxod hisoblash', style: TextStyle(fontSize: 12)),
                                   style: TextButton.styleFrom(
                                     foregroundColor: Colors.orange.shade700,
+                                    padding: const EdgeInsets.symmetric(vertical: 4),
+                                  ),
+                                ),
+                              ),
+                              Expanded(
+                                child: TextButton.icon(
+                                  onPressed: total > 0
+                                      ? () => Navigator.push(
+                                          context,
+                                          MaterialPageRoute(builder: (_) => CombinedDocumentsScreen(orderId: o.id)),
+                                        )
+                                      : null,
+                                  icon: const Icon(Icons.grid_on, size: 16),
+                                  label: const Text('Hujjatlar', style: TextStyle(fontSize: 12)),
+                                  style: TextButton.styleFrom(
+                                    foregroundColor: _primary,
                                     padding: const EdgeInsets.symmetric(vertical: 4),
                                   ),
                                 ),
@@ -300,10 +319,15 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                     padding: const EdgeInsets.all(14),
                     decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12)),
                     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      Text("Davlat: ${_order!['country']}"),
-                      Text("Firma: ${_order!['company_name']}"),
-                      if ((_order!['contract_number'] ?? '').toString().isNotEmpty)
-                        Text("Shartnoma: ${_order!['contract_number']}"),
+                      if ((_order!['order_date'] ?? '').toString().length >= 10)
+                        Text("Sana: ${_order!['order_date'].toString().substring(0, 10)}"),
+                      Text("Firma: ${_order!['firma_nomi'] ?? '-'}"),
+                      if ((_order!['davlati'] ?? '').toString().isNotEmpty)
+                        Text("Davlat: ${_order!['davlati']}"),
+                      if ((_order!['certification_number'] ?? '').toString().isNotEmpty)
+                        Text("Sertifikat: ${_order!['certification_number']}"),
+                      if ((_order!['shartnoma_raqami'] ?? '').toString().isNotEmpty)
+                        Text("Shartnoma: ${_order!['shartnoma_raqami']}"),
                     ]),
                   ),
                   Builder(builder: (context) {

@@ -2,6 +2,7 @@ import 'package:exim_raw/screens/order_screen.dart';
 import 'package:exim_raw/screens/products_screen.dart';
 import 'package:exim_raw/screens/orders_history_screen.dart';
 import 'package:exim_raw/screens/materials_screen.dart';
+import 'package:exim_raw/screens/partners_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 
@@ -43,6 +44,7 @@ class _HomeScreenState extends State<HomeScreen> {
     OrdersHistoryScreen(),
     MaterialsScreen(),
     ProductsScreen(),
+    PartnersScreen(),
   ];
 
   @override
@@ -72,6 +74,11 @@ class _HomeScreenState extends State<HomeScreen> {
             icon: Icon(Icons.inventory_2_outlined),
             selectedIcon: Icon(Icons.inventory_2),
             label: 'Mahsulotlar',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.handshake_outlined),
+            selectedIcon: Icon(Icons.handshake),
+            label: 'Hamkorlar',
           ),
         ],
       ),

@@ -1,9 +1,11 @@
 class OrderModel {
   final int id;
   final String orderNumber;
-  final String country;
-  final String companyName;
-  final String? contractNumber;
+  final int? partnerId;
+  final String? certificationNumber;
+  final String? firmaNomi;
+  final String? davlati;
+  final String? orderDate;
   final String? createdAt;
   final int? totalItems;
   final int? foundItems;
@@ -11,9 +13,11 @@ class OrderModel {
   OrderModel({
     required this.id,
     required this.orderNumber,
-    required this.country,
-    required this.companyName,
-    this.contractNumber,
+    this.partnerId,
+    this.certificationNumber,
+    this.firmaNomi,
+    this.davlati,
+    this.orderDate,
     this.createdAt,
     this.totalItems,
     this.foundItems,
@@ -22,9 +26,11 @@ class OrderModel {
   factory OrderModel.fromJson(Map<String, dynamic> json) => OrderModel(
     id: json['id'] as int,
     orderNumber: json['order_number']?.toString() ?? '',
-    country: json['country']?.toString() ?? '',
-    companyName: json['company_name']?.toString() ?? '',
-    contractNumber: json['contract_number']?.toString(),
+    partnerId: json['partner_id'] != null ? int.tryParse(json['partner_id'].toString()) : null,
+    certificationNumber: json['certification_number']?.toString(),
+    firmaNomi: json['firma_nomi']?.toString(),
+    davlati: json['davlati']?.toString(),
+    orderDate: json['order_date']?.toString(),
     createdAt: json['created_at']?.toString(),
     totalItems: json['total_items'] != null ? int.tryParse(json['total_items'].toString()) : null,
     foundItems: json['found_items'] != null ? int.tryParse(json['found_items'].toString()) : null,
@@ -32,8 +38,8 @@ class OrderModel {
 
   Map<String, dynamic> toJson() => {
     'order_number': orderNumber,
-    'country': country,
-    'company_name': companyName,
-    'contract_number': contractNumber,
+    'partner_id': partnerId,
+    'certification_number': certificationNumber,
+    'order_date': orderDate,
   };
 }

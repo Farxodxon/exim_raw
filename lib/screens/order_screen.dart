@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models/order.dart';
+import '../models/partner.dart';
 import '../services/excel_service.dart';
 import '../services/api_service.dart';
 
@@ -21,18 +22,28 @@ class _OrderScreenState extends State<OrderScreen> {
 
   static const Color _primary = Color(0xFF1565C0);
 
-  void _showOrderDialog() {
+  Future<void> _showOrderDialog() async {
     final orderNumCtrl = TextEditingController();
-    final countryCtrl = TextEditingController();
-    final companyCtrl = TextEditingController();
-    final contractCtrl = TextEditingController();
+    final certificationCtrl = TextEditingController();
     final formKey = GlobalKey<FormState>();
-    String? selectedCountry;
+    int? selectedPartnerId;
     bool isSaving = false;
     bool useNow = true;
     final now = DateTime.now();
     String selectedDate = now.toIso8601String().substring(0, 10);
-    final countries = ['Россия', 'Казахстан', 'Беларусь', 'Кыргызстан', 'Узбекистан', 'Другой'];
+
+    List<PartnerModel> partners;
+    try {
+      partners = await _api.getPartners();
+    } catch (e) {
+      _showMsg('Hamkorlarni yuklashda xato: $e', isError: true);
+      return;
+    }
+    if (!mounted) return;
+    if (partners.isEmpty) {
+      _showMsg("Avval Hamkorlar bo'limidan hamkor qo'shing", isError: true);
+      return;
+    }
 
     showDialog(
       context: context,
@@ -56,29 +67,24 @@ class _OrderScreenState extends State<OrderScreen> {
                     validator: (v) => v == null || v.isEmpty ? 'Majburiy' : null,
                   ),
                   const SizedBox(height: 12),
-                  DropdownButtonFormField<String>(
+                  DropdownButtonFormField<int>(
+                    isExpanded: true,
                     decoration: const InputDecoration(
-                      labelText: 'Davlat *',
+                      labelText: 'Hamkor (Firma) *',
                       border: OutlineInputBorder(), isDense: true,
                     ),
-                    items: countries.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
-                    onChanged: (v) { setS(() => selectedCountry = v); countryCtrl.text = v ?? ''; },
-                    validator: (_) => (selectedCountry == null || selectedCountry!.isEmpty) ? 'Majburiy' : null,
+                    items: partners.map((p) => DropdownMenuItem(
+                      value: p.id,
+                      child: Text(p.firmaNomi, overflow: TextOverflow.ellipsis),
+                    )).toList(),
+                    onChanged: (v) => setS(() => selectedPartnerId = v),
+                    validator: (v) => v == null ? 'Majburiy' : null,
                   ),
                   const SizedBox(height: 12),
                   TextFormField(
-                    controller: companyCtrl,
+                    controller: certificationCtrl,
                     decoration: const InputDecoration(
-                      labelText: 'Firma nomi *',
-                      border: OutlineInputBorder(), isDense: true,
-                    ),
-                    validator: (v) => v == null || v.isEmpty ? 'Majburiy' : null,
-                  ),
-                  const SizedBox(height: 12),
-                  TextFormField(
-                    controller: contractCtrl,
-                    decoration: const InputDecoration(
-                      labelText: 'Shartnoma raqami',
+                      labelText: 'Sertifikatsiya raqami',
                       border: OutlineInputBorder(), isDense: true,
                     ),
                   ),
@@ -148,13 +154,27 @@ class _OrderScreenState extends State<OrderScreen> {
                   final expDate = useNow ? null : selectedDate;
                   final order = await _api.createOrder({
                     'order_number': orderNumCtrl.text.trim(),
-                    'country': countryCtrl.text.trim(),
-                    'company_name': companyCtrl.text.trim(),
-                    'contract_number': contractCtrl.text.trim(),
+                    'partner_id': selectedPartnerId,
+                    'certification_number':
+                        certificationCtrl.text.trim().isEmpty ? null : certificationCtrl.text.trim(),
+                    'order_date': useNow ? null : selectedDate,
                   });
+                  final selectedPartner = partners.firstWhere((p) => p.id == selectedPartnerId);
+                  final enrichedOrder = OrderModel(
+                    id: order.id,
+                    orderNumber: order.orderNumber,
+                    partnerId: order.partnerId,
+                    certificationNumber: order.certificationNumber,
+                    firmaNomi: selectedPartner.firmaNomi,
+                    davlati: selectedPartner.davlati,
+                    orderDate: order.orderDate,
+                    createdAt: order.createdAt,
+                    totalItems: order.totalItems,
+                    foundItems: order.foundItems,
+                  );
                   if (ctx.mounted) Navigator.pop(ctx);
                   setState(() {
-                    _currentOrder = order;
+                    _currentOrder = enrichedOrder;
                     _orderExpenseDate = expDate;
                     _results = [];
                     _expenseResults = [];
@@ -313,10 +333,11 @@ class _OrderScreenState extends State<OrderScreen> {
                   ),
               ]),
               const SizedBox(height: 4),
-              Text('Davlat: ${_currentOrder!.country}', style: const TextStyle(fontSize: 13)),
-              Text('Firma: ${_currentOrder!.companyName}', style: const TextStyle(fontSize: 13)),
-              if ((_currentOrder!.contractNumber ?? '').isNotEmpty)
-                Text('Shartnoma: ${_currentOrder!.contractNumber}', style: const TextStyle(fontSize: 13)),
+              Text('Firma: ${_currentOrder!.firmaNomi ?? '-'}', style: const TextStyle(fontSize: 13)),
+              if ((_currentOrder!.davlati ?? '').isNotEmpty)
+                Text('Davlat: ${_currentOrder!.davlati}', style: const TextStyle(fontSize: 13)),
+              if ((_currentOrder!.certificationNumber ?? '').isNotEmpty)
+                Text('Sertifikat: ${_currentOrder!.certificationNumber}', style: const TextStyle(fontSize: 13)),
             ]),
           ),
         Padding(

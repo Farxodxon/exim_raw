@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
+import '../models/product.dart';
 
 class MaterialsScreen extends StatefulWidget {
   const MaterialsScreen({super.key});
@@ -64,6 +65,7 @@ class _MaterialsScreenState extends State<MaterialsScreen>
           const SizedBox(height: 12),
           DropdownButtonFormField<String>(
             value: unit,
+            isExpanded: true,
             decoration: const InputDecoration(labelText: 'Birlik', border: OutlineInputBorder(), isDense: true),
             items: ['kg', 'g', 'l'].map((u) => DropdownMenuItem(value: u, child: Text(u))).toList(),
             onChanged: (v) => setS(() => unit = v ?? 'kg'),
@@ -103,6 +105,7 @@ class _MaterialsScreenState extends State<MaterialsScreen>
           child: Column(mainAxisSize: MainAxisSize.min, children: [
             DropdownButtonFormField<int>(
               value: selectedMat,
+              isExpanded: true,
               decoration: const InputDecoration(labelText: 'Siryo *', border: OutlineInputBorder(), isDense: true),
               items: _materials.map((m) => DropdownMenuItem<int>(
                 value: m['id'] as int,
@@ -333,8 +336,40 @@ class _MaterialDetailScreenState extends State<MaterialDetailScreen> {
     }
   }
 
-  void _addProductLink() {
-    final barcodeCtrl = TextEditingController();
+  List<Map<String, dynamic>> get _groupedExpenses {
+    final Map<int, Map<String, dynamic>> grouped = {};
+    for (final e in _expenses) {
+      final orderId = e['order_id'] as int? ?? -1;
+      final kg = double.tryParse(e['quantity_kg']?.toString() ?? '') ?? 0;
+      if (!grouped.containsKey(orderId)) {
+        grouped[orderId] = {
+          'order_id': orderId,
+          'order_number': e['order_number'],
+          'expense_date': e['expense_date'] ?? e['created_at'],
+          'total_kg': 0.0,
+        };
+      }
+      grouped[orderId]!['total_kg'] = (grouped[orderId]!['total_kg'] as double) + kg;
+    }
+    final list = grouped.values.toList();
+    list.sort((a, b) => (b['expense_date'] ?? '').toString().compareTo((a['expense_date'] ?? '').toString()));
+    return list;
+  }
+
+  Future<void> _addProductLink() async {
+    List<Product> allProducts = [];
+    try {
+      allProducts = await _api.getProducts();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Mahsulotlarni yuklashda xato: $e'), backgroundColor: Colors.red));
+      }
+      return;
+    }
+    if (!mounted) return;
+
+    Product? selectedProduct;
     final gramsCtrl = TextEditingController();
     final dateCtrl = TextEditingController();
     bool isActive = true;
@@ -345,10 +380,55 @@ class _MaterialDetailScreenState extends State<MaterialDetailScreen> {
         title: const Text('Mahsulot biriktirish', style: TextStyle(fontWeight: FontWeight.bold)),
         content: SizedBox(width: 400, child: Form(key: formKey, child: SingleChildScrollView(
           child: Column(mainAxisSize: MainAxisSize.min, children: [
-            TextFormField(controller: barcodeCtrl, decoration: const InputDecoration(
-              labelText: 'Mahsulot barkodi *', border: OutlineInputBorder(), isDense: true),
-              keyboardType: TextInputType.number,
-              validator: (v) => v == null || v.isEmpty ? 'Majburiy' : null),
+            Autocomplete<Product>(
+              displayStringForOption: (p) => p.name,
+              optionsBuilder: (textEditingValue) {
+                final q = textEditingValue.text.trim().toLowerCase();
+                if (q.isEmpty) return const Iterable<Product>.empty();
+                return allProducts.where((p) =>
+                  p.name.toLowerCase().contains(q) || p.barcode.contains(q));
+              },
+              onSelected: (p) => setS(() => selectedProduct = p),
+              optionsViewBuilder: (context, onSelected, options) => Align(
+                alignment: Alignment.topLeft,
+                child: Material(
+                  elevation: 4,
+                  child: SizedBox(
+                    width: 352,
+                    height: 220,
+                    child: ListView.builder(
+                      padding: EdgeInsets.zero,
+                      itemCount: options.length,
+                      itemBuilder: (context, i) {
+                        final p = options.elementAt(i);
+                        return ListTile(
+                          dense: true,
+                          title: Text(p.name, style: const TextStyle(fontSize: 13)),
+                          subtitle: Text(p.barcode, style: const TextStyle(fontSize: 11, color: Colors.grey)),
+                          onTap: () => onSelected(p),
+                        );
+                      },
+                    ),
+                  ),
+                ),
+              ),
+              fieldViewBuilder: (context, controller, focusNode, onSubmit) => TextFormField(
+                controller: controller,
+                focusNode: focusNode,
+                decoration: const InputDecoration(
+                  labelText: 'Mahsulot nomi *',
+                  hintText: 'Qidirish uchun yozing...',
+                  border: OutlineInputBorder(), isDense: true,
+                ),
+                validator: (v) => selectedProduct == null ? "Ro'yxatdan mahsulot tanlang" : null,
+              ),
+            ),
+            if (selectedProduct != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Text('Barkod: ${selectedProduct!.barcode}',
+                    style: const TextStyle(fontSize: 11, color: Colors.grey)),
+              ),
             const SizedBox(height: 12),
             TextFormField(controller: gramsCtrl, decoration: const InputDecoration(
               labelText: '1 dona uchun necha gram *', border: OutlineInputBorder(),
@@ -381,7 +461,7 @@ class _MaterialDetailScreenState extends State<MaterialDetailScreen> {
               if (!formKey.currentState!.validate()) return;
               try {
                 await _api.createProductMaterial({
-                  'product_barcode': barcodeCtrl.text.trim(),
+                  'product_barcode': selectedProduct!.barcode,
                   'raw_material_id': widget.material['id'],
                   'grams_per_unit': double.parse(gramsCtrl.text),
                   'is_active': isActive,
@@ -506,9 +586,11 @@ class _MaterialDetailScreenState extends State<MaterialDetailScreen> {
                     ]))
                   : ListView.builder(
                       padding: const EdgeInsets.fromLTRB(12, 0, 12, 16),
-                      itemCount: _expenses.length,
+                      itemCount: _groupedExpenses.length,
                       itemBuilder: (ctx, i) {
-                        final e = _expenses[i];
+                        final e = _groupedExpenses[i];
+                        final dateStr = (e['expense_date'] ?? '').toString();
+                        final dateShort = dateStr.length >= 10 ? dateStr.substring(0, 10) : dateStr;
                         return Container(
                           margin: const EdgeInsets.only(bottom: 6),
                           decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10)),
@@ -517,9 +599,9 @@ class _MaterialDetailScreenState extends State<MaterialDetailScreen> {
                             leading: const Icon(Icons.arrow_upward, color: Colors.orange, size: 20),
                             title: Text("Buyurtma: ${e['order_number'] ?? '-'}",
                                 style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-                            subtitle: Text("Barcode: ${e['product_barcode']}",
+                            subtitle: Text(dateShort,
                                 style: const TextStyle(fontSize: 11)),
-                            trailing: Text("${e['quantity_kg']} kg",
+                            trailing: Text("${(e['total_kg'] as double).toStringAsFixed(3)} kg",
                                 style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.orange)),
                           ),
                         );

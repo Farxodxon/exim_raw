@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models/product.dart';
+import '../models/product_category.dart';
 import '../services/api_service.dart';
 
 class ProductsScreen extends StatefulWidget {
@@ -12,9 +13,10 @@ class ProductsScreen extends StatefulWidget {
 class _ProductsScreenState extends State<ProductsScreen> {
   final ApiService _api = ApiService();
   List<Product> _products = [];
-  List<String> _categories = [];
+  List<ProductCategory> _categoryTree = [];
   bool _isLoading = false;
-  String _selectedCategory = '';
+  int? _selectedMainCategoryId;
+  int? _selectedSeriesId;
   final _searchCtrl = TextEditingController();
 
   static const Color _primary = Color(0xFF1565C0);
@@ -34,8 +36,8 @@ class _ProductsScreenState extends State<ProductsScreen> {
 
   Future<void> _loadCategories() async {
     try {
-      final cats = await _api.getCategories();
-      if (mounted) setState(() => _categories = cats);
+      final tree = await _api.getCategoryTree();
+      if (mounted) setState(() => _categoryTree = tree);
     } catch (_) {}
   }
 
@@ -44,7 +46,8 @@ class _ProductsScreenState extends State<ProductsScreen> {
     try {
       final list = await _api.getProducts(
         search: _searchCtrl.text.trim(),
-        category: _selectedCategory,
+        categoryId: _selectedSeriesId,
+        mainCategoryId: _selectedSeriesId == null ? _selectedMainCategoryId : null,
       );
       if (mounted) setState(() { _products = list; _isLoading = false; });
     } catch (e) {
@@ -66,90 +69,178 @@ class _ProductsScreenState extends State<ProductsScreen> {
   void _openForm({Product? product}) {
     final barcodeCtrl = TextEditingController(text: product?.barcode ?? '');
     final nameCtrl    = TextEditingController(text: product?.name ?? '');
-    final categoryCtrl = TextEditingController(text: product?.category ?? '');
     final tnvedCtrl   = TextEditingController(text: product?.tnved ?? '');
     final pcsCtrl     = TextEditingController(text: product?.pcsInBox?.toString() ?? '');
     final priceCtrl   = TextEditingController(text: product?.priceUsd?.toString() ?? '');
     final nettoCtrl   = TextEditingController(text: product?.nettoPerPiece?.toString() ?? '');
+
+    final lengthCtrl  = TextEditingController(text: product?.boxLengthCm?.toString() ?? '');
+    final widthCtrl   = TextEditingController(text: product?.boxWidthCm?.toString() ?? '');
+    final heightCtrl  = TextEditingController(text: product?.boxHeightCm?.toString() ?? '');
+    final boxNettoCtrl   = TextEditingController(text: product?.boxNettoKg?.toString() ?? '');
+    final boxBruttoCtrl  = TextEditingController(text: product?.boxBruttoKg?.toString() ?? '');
+    final compositionCtrl = TextEditingController(text: product?.compositionText ?? '');
+
+    int? mainId = product?.mainCategoryId;
+    int? seriesId = product?.categoryId;
+
     final formKey = GlobalKey<FormState>();
     bool saving = false;
 
     showDialog(
       context: context,
       builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setS) => AlertDialog(
-          title: Text(product == null ? "Yangi mahsulot" : "Tahrirlash",
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-          content: SizedBox(
-            width: 420,
-            child: Form(
-              key: formKey,
-              child: SingleChildScrollView(
-                child: Column(mainAxisSize: MainAxisSize.min, children: [
-                  _field(barcodeCtrl, 'Shtrix kod *',
-                      validator: (v) => v == null || v.isEmpty ? 'Majburiy' : null),
-                  const SizedBox(height: 12),
-                  _field(nameCtrl, 'Nomi *',
-                      validator: (v) => v == null || v.isEmpty ? 'Majburiy' : null),
-                  const SizedBox(height: 12),
-                  _autocompleteCategory(categoryCtrl),
-                  const SizedBox(height: 12),
-                  _field(tnvedCtrl, 'TNVED kodi'),
-                  const SizedBox(height: 12),
-                  Row(children: [
-                    Expanded(child: _field(pcsCtrl, 'Qutidagi dona',
-                        keyboardType: TextInputType.number)),
-                    const SizedBox(width: 12),
-                    Expanded(child: _field(priceCtrl, 'Narxi (USD)',
-                        keyboardType: TextInputType.number)),
+        builder: (ctx, setS) {
+          final mainCat = _categoryTree.where((c) => c.id == mainId);
+          final seriesList = mainCat.isNotEmpty ? mainCat.first.series : <CategorySeries>[];
+
+          return AlertDialog(
+            title: Text(product == null ? "Yangi mahsulot" : "Tahrirlash",
+                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            content: SizedBox(
+              width: 440,
+              child: Form(
+                key: formKey,
+                child: SingleChildScrollView(
+                  child: Column(mainAxisSize: MainAxisSize.min, children: [
+                    _field(barcodeCtrl, 'Shtrix kod *',
+                        validator: (v) => v == null || v.isEmpty ? 'Majburiy' : null),
+                    const SizedBox(height: 12),
+                    _field(nameCtrl, 'Nomi *',
+                        validator: (v) => v == null || v.isEmpty ? 'Majburiy' : null),
+                    const SizedBox(height: 12),
+                    DropdownButtonFormField<int>(
+                      initialValue: mainId,
+                      isExpanded: true,
+                      decoration: const InputDecoration(
+                        labelText: 'Asosiy toifa',
+                        border: OutlineInputBorder(), isDense: true,
+                      ),
+                      items: _categoryTree.map((c) => DropdownMenuItem(
+                        value: c.id,
+                        child: Text(c.name, overflow: TextOverflow.ellipsis),
+                      )).toList(),
+                      onChanged: (v) => setS(() { mainId = v; seriesId = null; }),
+                    ),
+                    const SizedBox(height: 12),
+                    DropdownButtonFormField<int>(
+                      initialValue: seriesId,
+                      isExpanded: true,
+                      decoration: const InputDecoration(
+                        labelText: 'Seriya',
+                        border: OutlineInputBorder(), isDense: true,
+                      ),
+                      items: seriesList.map((s) => DropdownMenuItem(
+                        value: s.id,
+                        child: Text(s.name, overflow: TextOverflow.ellipsis),
+                      )).toList(),
+                      onChanged: mainId == null ? null : (v) => setS(() => seriesId = v),
+                    ),
+                    const SizedBox(height: 12),
+                    _field(tnvedCtrl, 'TNVED kodi'),
+                    const SizedBox(height: 12),
+                    Row(children: [
+                      Expanded(child: _field(pcsCtrl, 'Qutidagi dona',
+                          keyboardType: TextInputType.number)),
+                      const SizedBox(width: 12),
+                      Expanded(child: _field(priceCtrl, 'Narxi (USD)',
+                          keyboardType: TextInputType.number)),
+                    ]),
+                    const SizedBox(height: 12),
+                    _field(nettoCtrl, 'Netto (1 dona, kg)',
+                        keyboardType: TextInputType.number),
+                    const SizedBox(height: 16),
+                    Align(alignment: Alignment.centerLeft,
+                        child: Text('Karobka (quti) o\'lchamlari — ixtiyoriy',
+                            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.grey[700]))),
+                    const SizedBox(height: 8),
+                    Row(children: [
+                      Expanded(child: _field(lengthCtrl, 'Uzunligi (sm)', keyboardType: TextInputType.number)),
+                      const SizedBox(width: 8),
+                      Expanded(child: _field(widthCtrl, 'Kengligi (sm)', keyboardType: TextInputType.number)),
+                      const SizedBox(width: 8),
+                      Expanded(child: _field(heightCtrl, 'Balandligi (sm)', keyboardType: TextInputType.number)),
+                    ]),
+                    const SizedBox(height: 12),
+                    Row(children: [
+                      Expanded(child: _field(boxNettoCtrl, 'Netto (kg)', keyboardType: TextInputType.number)),
+                      const SizedBox(width: 12),
+                      Expanded(child: _field(boxBruttoCtrl, 'Brutto (kg)', keyboardType: TextInputType.number)),
+                    ]),
+                    const SizedBox(height: 12),
+                    TextFormField(
+                      controller: compositionCtrl,
+                      maxLines: 4,
+                      decoration: const InputDecoration(
+                        labelText: "Tarkib tavsifi (schyot-faktura uchun)",
+                        hintText: "1 штука включает: крем-краска – 2 пакет по 25 мл, ...",
+                        border: OutlineInputBorder(),
+                        isDense: true,
+                        alignLabelWithHint: true,
+                      ),
+                    ),
                   ]),
-                  const SizedBox(height: 12),
-                  _field(nettoCtrl, 'Netto (1 dona, kg)',
-                      keyboardType: TextInputType.number),
-                ]),
+                ),
               ),
             ),
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Bekor')),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                  backgroundColor: _primary, foregroundColor: Colors.white),
-              onPressed: saving ? null : () async {
-                if (!formKey.currentState!.validate()) return;
-                setS(() => saving = true);
-                try {
-                  final data = {
-                    'barcode': barcodeCtrl.text.trim(),
-                    'name': nameCtrl.text.trim(),
-                    'category': categoryCtrl.text.trim().isEmpty ? null : categoryCtrl.text.trim(),
-                    'tnved': tnvedCtrl.text.trim().isEmpty ? null : tnvedCtrl.text.trim(),
-                    'pcs_in_box': pcsCtrl.text.isEmpty ? null : int.tryParse(pcsCtrl.text),
-                    'price_usd': priceCtrl.text.isEmpty ? null : double.tryParse(priceCtrl.text),
-                    'netto_per_piece': nettoCtrl.text.isEmpty ? null : double.tryParse(nettoCtrl.text),
-                  };
-                  if (product == null) {
-                    await _api.createProduct(data);
-                    _showMsg("Mahsulot qo'shildi");
-                  } else {
-                    await _api.updateProduct(product.id, data);
-                    _showMsg('Mahsulot yangilandi');
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Bekor')),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                    backgroundColor: _primary, foregroundColor: Colors.white),
+                onPressed: saving ? null : () async {
+                  if (!formKey.currentState!.validate()) return;
+                  setS(() => saving = true);
+                  try {
+                    String? categoryLabel;
+                    if (mainId != null) {
+                      final main = _categoryTree.firstWhere((c) => c.id == mainId);
+                      if (seriesId != null) {
+                        final s = main.series.firstWhere((s) => s.id == seriesId);
+                        categoryLabel = s.name == 'Éclair standart' ? main.name : '${main.name} · ${s.name}';
+                      } else {
+                        categoryLabel = main.name;
+                      }
+                    }
+                    final data = {
+                      'barcode': barcodeCtrl.text.trim(),
+                      'name': nameCtrl.text.trim(),
+                      'category': categoryLabel,
+                      'category_id': seriesId,
+                      'tnved': tnvedCtrl.text.trim().isEmpty ? null : tnvedCtrl.text.trim(),
+                      'pcs_in_box': pcsCtrl.text.isEmpty ? null : int.tryParse(pcsCtrl.text),
+                      'price_usd': priceCtrl.text.isEmpty ? null : double.tryParse(priceCtrl.text),
+                      'netto_per_piece': nettoCtrl.text.isEmpty ? null : double.tryParse(nettoCtrl.text),
+                      'box_length_cm': lengthCtrl.text.isEmpty ? null : double.tryParse(lengthCtrl.text),
+                      'box_width_cm': widthCtrl.text.isEmpty ? null : double.tryParse(widthCtrl.text),
+                      'box_height_cm': heightCtrl.text.isEmpty ? null : double.tryParse(heightCtrl.text),
+                      'box_netto_kg': boxNettoCtrl.text.isEmpty ? null : double.tryParse(boxNettoCtrl.text),
+                      'box_brutto_kg': boxBruttoCtrl.text.isEmpty ? null : double.tryParse(boxBruttoCtrl.text),
+                      'composition_text': compositionCtrl.text.trim().isEmpty ? null : compositionCtrl.text.trim(),
+                    };
+                    if (product == null) {
+                      await _api.createProduct(data);
+                      _showMsg("Mahsulot qo'shildi");
+                    } else {
+                      await _api.updateProduct(product.id, data);
+                      _showMsg('Mahsulot yangilandi');
+                    }
+                    if (ctx.mounted) Navigator.pop(ctx);
+                    _loadProducts();
+                    _loadCategories();
+                  } catch (e) {
+                    _showMsg('Xato: $e', isError: true);
+                    setS(() => saving = false);
                   }
-                  if (ctx.mounted) Navigator.pop(ctx);
-                  _loadProducts();
-                  _loadCategories();
-                } catch (e) {
-                  _showMsg('Xato: $e', isError: true);
-                  setS(() => saving = false);
-                }
-              },
-              child: saving
-                  ? const SizedBox(width: 16, height: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                  : Text(product == null ? "Qo'shish" : 'Saqlash'),
-            ),
-          ],
-        ),
+                },
+                child: saving
+                    ? const SizedBox(width: 16, height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                    : Text(product == null ? "Qo'shish" : 'Saqlash'),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -166,30 +257,6 @@ class _ProductsScreenState extends State<ProductsScreen> {
         contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         isDense: true,
       ),
-    );
-  }
-
-  Widget _autocompleteCategory(TextEditingController ctrl) {
-    return Autocomplete<String>(
-      initialValue: TextEditingValue(text: ctrl.text),
-      optionsBuilder: (v) => _categories
-          .where((c) => c.toLowerCase().contains(v.text.toLowerCase()))
-          .toList(),
-      onSelected: (v) => ctrl.text = v,
-      fieldViewBuilder: (ctx, fCtrl, focusNode, onSubmit) {
-        fCtrl.text = ctrl.text;
-        fCtrl.addListener(() => ctrl.text = fCtrl.text);
-        return TextFormField(
-          controller: fCtrl,
-          focusNode: focusNode,
-          decoration: const InputDecoration(
-            labelText: 'Kategoriya',
-            border: OutlineInputBorder(),
-            contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-            isDense: true,
-          ),
-        );
-      },
     );
   }
 
@@ -223,6 +290,9 @@ class _ProductsScreenState extends State<ProductsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final selectedMain = _categoryTree.where((c) => c.id == _selectedMainCategoryId);
+    final seriesForSelectedMain = selectedMain.isNotEmpty ? selectedMain.first.series : <CategorySeries>[];
+
     return Scaffold(
       backgroundColor: const Color(0xFFF0F4F8),
       appBar: AppBar(
@@ -263,16 +333,31 @@ class _ProductsScreenState extends State<ProductsScreen> {
             onChanged: (_) => _loadProducts(),
           ),
         ),
-        if (_categories.isNotEmpty)
+        if (_categoryTree.isNotEmpty)
           SizedBox(
             height: 40,
             child: ListView(
               scrollDirection: Axis.horizontal,
               padding: const EdgeInsets.symmetric(horizontal: 12),
               children: [
-                _chip('Hammasi', ''),
-                ..._categories.map((c) => _chip(c, c)),
+                _mainChip('Hammasi', null),
+                ..._categoryTree.map((c) => _mainChip(c.name, c.id)),
               ],
+            ),
+          ),
+        if (_selectedMainCategoryId != null && seriesForSelectedMain.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: SizedBox(
+              height: 34,
+              child: ListView(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                children: [
+                  _seriesChip('Barcha seriyalar', null),
+                  ...seriesForSelectedMain.map((s) => _seriesChip(s.name, s.id)),
+                ],
+              ),
             ),
           ),
         Expanded(
@@ -298,8 +383,8 @@ class _ProductsScreenState extends State<ProductsScreen> {
     );
   }
 
-  Widget _chip(String label, String value) {
-    final selected = _selectedCategory == value;
+  Widget _mainChip(String label, int? value) {
+    final selected = _selectedMainCategoryId == value;
     return Padding(
       padding: const EdgeInsets.only(right: 6),
       child: ChoiceChip(
@@ -309,7 +394,25 @@ class _ProductsScreenState extends State<ProductsScreen> {
         selectedColor: _primary,
         backgroundColor: Colors.white,
         onSelected: (_) {
-          setState(() => _selectedCategory = value);
+          setState(() { _selectedMainCategoryId = value; _selectedSeriesId = null; });
+          _loadProducts();
+        },
+      ),
+    );
+  }
+
+  Widget _seriesChip(String label, int? value) {
+    final selected = _selectedSeriesId == value;
+    return Padding(
+      padding: const EdgeInsets.only(right: 6),
+      child: ChoiceChip(
+        label: Text(label,
+            style: TextStyle(fontSize: 11, color: selected ? Colors.white : Colors.black87)),
+        selected: selected,
+        selectedColor: Colors.orange,
+        backgroundColor: Colors.white,
+        onSelected: (_) {
+          setState(() => _selectedSeriesId = value);
           _loadProducts();
         },
       ),
@@ -340,14 +443,15 @@ class _ProductsScreenState extends State<ProductsScreen> {
           children: [
             Text('Barcode: ${p.barcode}',
                 style: const TextStyle(fontSize: 12, color: Colors.grey)),
-            if (p.category != null)
-              Text(p.category!,
+            if (p.categoryLabel.isNotEmpty)
+              Text(p.categoryLabel,
                   style: const TextStyle(fontSize: 12, color: Colors.blueGrey)),
             const SizedBox(height: 2),
-            Row(children: [
+            Wrap(spacing: 6, runSpacing: 4, children: [
               if (p.pcsInBox != null) _badge('${p.pcsInBox} dona/quti', Colors.blue),
               if (p.priceUsd != null) _badge('\$${p.priceUsd!.toStringAsFixed(2)}', Colors.green),
               if (p.tnved != null) _badge('TN: ${p.tnved}', Colors.orange),
+              if (p.boxVolumeM3 != null) _badge('${p.boxVolumeM3!.toStringAsFixed(4)} m³/quti', Colors.purple),
             ]),
           ],
         ),
