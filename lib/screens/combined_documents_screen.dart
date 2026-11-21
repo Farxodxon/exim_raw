@@ -7,6 +7,7 @@ import '../models/tir_data.dart';
 import '../models/invoice_data.dart';
 import '../models/product.dart';
 import '../services/api_service.dart';
+import '../utils/date_format.dart';
 
 class CombinedDocumentsScreen extends StatefulWidget {
   final int orderId;
@@ -468,10 +469,8 @@ void _fillDalolatnomaSheet({
   final sheet = excel['Далолатнома'];
   final order = data.order;
 
-  final orderDateStr = (order.orderDate != null && order.orderDate!.length >= 10)
-      ? order.orderDate!.substring(0, 10) : '';
-  final contractDateStr = (order.shartnomaSanasi != null && order.shartnomaSanasi!.length >= 10)
-      ? order.shartnomaSanasi!.substring(0, 10) : '';
+  final orderDateStr = fmtDate(order.orderDate);
+  final contractDateStr = fmtDate(order.shartnomaSanasi);
 
   final boldStyle = xls.CellStyle(bold: true, fontSize: 11);
   final titleStyle = xls.CellStyle(bold: true, fontSize: 14, horizontalAlign: xls.HorizontalAlign.Center);
@@ -722,7 +721,8 @@ void _fillInvoiceLikeSheet({
   int r = 0;
   mergedText(r, titleText, titleStyle);
   r += 1;
-  mergedText(r, 'к контракту № ${order.shartnomaRaqami ?? _nomalum} от ${(order.shartnomaSanasi ?? '').toString().split('T').first.isEmpty ? _nomalum : (order.shartnomaSanasi ?? '').toString().split('T').first}', normalStyle);
+  final contractDate = fmtDate(order.shartnomaSanasi);
+  mergedText(r, 'к контракту № ${order.shartnomaRaqami ?? _nomalum} от ${contractDate.isEmpty ? _nomalum : contractDate}', normalStyle);
   r += 2;
 
   // Sotuvchi — own_company jadvalidan (bazadan)
