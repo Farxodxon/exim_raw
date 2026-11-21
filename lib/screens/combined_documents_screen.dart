@@ -5,6 +5,7 @@ import 'package:path_provider/path_provider.dart';
 import '../models/dalolatnoma.dart';
 import '../models/tir_data.dart';
 import '../models/invoice_data.dart';
+import '../models/product.dart';
 import '../services/api_service.dart';
 
 class CombinedDocumentsScreen extends StatefulWidget {
@@ -27,6 +28,7 @@ class _CombinedDocumentsScreenState extends State<CombinedDocumentsScreen> {
 
   final Map<int, List<Map<String, dynamic>>> _incomesByMaterial = {};
   final Map<int, Map<String, dynamic>?> _selectedIncome = {};
+  Map<String, Product>? _productsByBarcode;
 
   final _invoiceNumberCtrl = TextEditingController();
   final _cmrNumberCtrl = TextEditingController();
@@ -94,6 +96,79 @@ class _CombinedDocumentsScreenState extends State<CombinedDocumentsScreen> {
     ));
   }
 
+  Future<List<String>> _documentIssues() async {
+    if (_productsByBarcode == null) {
+      try {
+        final products = await _api.getProducts();
+        _productsByBarcode = {for (final p in products) p.barcode: p};
+      } catch (_) {
+        _productsByBarcode = {};
+      }
+    }
+    final products = _productsByBarcode ?? const <String, Product>{};
+    final issues = <String>[];
+    for (final it in _invoiceData!.items) {
+      final missing = <String>[];
+      if (it.priceUsd <= 0) missing.add('narx (USD)');
+      if ((it.tnved ?? '').trim().isEmpty) missing.add('TNVED');
+      final p = products[it.barcode];
+      if (p != null) {
+        if (p.boxLengthCm == null || p.boxWidthCm == null || p.boxHeightCm == null) {
+          missing.add("karobka o'lchami (L/W/H)");
+        }
+        if (p.boxNettoKg == null || p.boxBruttoKg == null) {
+          missing.add('karobka netto/brutto');
+        }
+      } else if (it.boxNettoKg == null || it.boxBruttoKg == null) {
+        missing.add('karobka netto/brutto');
+      }
+      if (missing.isNotEmpty) issues.add('${it.name} - ${missing.join(', ')}');
+    }
+    return issues;
+  }
+
+  Future<bool?> _confirmDocumentIssues(List<String> issues) {
+    return showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text("Hujjatda to'liq bo'lmagan ma'lumotlar"),
+        content: SizedBox(
+          width: 460,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text("Quyidagi mahsulotlarda hujjat uchun zarur maydonlar yo'q:"),
+                const SizedBox(height: 8),
+                for (final line in issues)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 4),
+                    child: Text('- $line', style: const TextStyle(fontSize: 12)),
+                  ),
+                const SizedBox(height: 8),
+                const Text("Davom etsangiz, bu joylar bo'sh yoki 0 bo'lib chiqadi.",
+                    style: TextStyle(fontSize: 12, color: Colors.black54)),
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Bekor qilish'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.orange, foregroundColor: Colors.white),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Baribir davom etish'),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _generateAll() async {
     if (_dalolatnomaData == null || _tirData == null || _invoiceData == null) return;
 
@@ -116,6 +191,13 @@ class _CombinedDocumentsScreenState extends State<CombinedDocumentsScreen> {
     if (missing.isNotEmpty) {
       _showMsg("Quyidagi xomashyolar uchun kirim hujjati tanlanmagan: ${missing.join(', ')}", isError: true);
       return;
+    }
+
+    final issues = await _documentIssues();
+    if (!mounted) return;
+    if (issues.isNotEmpty) {
+      final proceed = await _confirmDocumentIssues(issues);
+      if (!mounted || proceed != true) return;
     }
 
     setState(() => _generating = true);

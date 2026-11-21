@@ -452,6 +452,8 @@ class _ProductsScreenState extends State<ProductsScreen> {
               if (p.priceUsd != null) _badge('\$${p.priceUsd!.toStringAsFixed(2)}', Colors.green),
               if (p.tnved != null) _badge('TN: ${p.tnved}', Colors.orange),
               if (p.boxVolumeM3 != null) _badge('${p.boxVolumeM3!.toStringAsFixed(4)} m³/quti', Colors.purple),
+              if (p.boxLengthCm == null && p.boxWidthCm == null && p.boxHeightCm == null)
+                _missingDimBadge(),
             ]),
           ],
         ),
@@ -473,6 +475,19 @@ class _ProductsScreenState extends State<ProductsScreen> {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _missingDimBadge() {
+    return Container(
+      margin: const EdgeInsets.only(right: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        border: Border.all(color: Colors.black45),
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: const Text("O'lchami yo'q",
+          style: TextStyle(fontSize: 10, color: Colors.black87, fontWeight: FontWeight.w600)),
     );
   }
 

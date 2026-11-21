@@ -2,6 +2,12 @@ import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 import '../models/product.dart';
 
+String _fmtDate(dynamic value) {
+  final s = value?.toString().trim() ?? '';
+  if (s.isEmpty) return '-';
+  return s.length >= 10 ? s.substring(0, 10) : s;
+}
+
 class MaterialsScreen extends StatefulWidget {
   const MaterialsScreen({super.key});
   @override
@@ -265,7 +271,7 @@ class _MaterialsScreenState extends State<MaterialsScreen>
               subtitle: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Text('Netto: ${inc['netto_kg']} kg  |  Brutto: ${inc['brutto_kg'] ?? '-'} kg',
                     style: const TextStyle(fontSize: 12)),
-                Text('Hujjat: ${inc['doc_number']}  |  ${(inc['income_date'] ?? '').toString().substring(0, 10)}',
+                Text('Hujjat: ${inc['doc_number']}  |  ${_fmtDate(inc['income_date'])}',
                     style: const TextStyle(fontSize: 11, color: Colors.grey)),
               ]),
               isThreeLine: true,
@@ -559,7 +565,7 @@ class _MaterialDetailScreenState extends State<MaterialDetailScreen> {
                     const Spacer(),
                     Text('${p['grams_per_unit']} g/dona', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF1565C0))),
                     if (p['active_from'] != null)
-                      Text('${p['active_from'].toString().substring(0, 10)} dan', style: const TextStyle(fontSize: 9, color: Colors.grey)),
+                      Text('${_fmtDate(p['active_from'])} dan', style: const TextStyle(fontSize: 9, color: Colors.grey)),
                   ]),
                 );
               },
