@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 import '../models/product.dart';
+import '../widgets/linked_product_card.dart';
 
 String _fmtDate(dynamic value) {
   final s = value?.toString().trim() ?? '';
@@ -21,6 +22,7 @@ class _MaterialsScreenState extends State<MaterialsScreen>
   List<Map<String, dynamic>> _materials = [];
   List<Map<String, dynamic>> _incomes = [];
   bool _loading = true;
+  bool _stockOnly = false;
   static const Color _primary = Color(0xFF1565C0);
 
   @override
@@ -198,52 +200,140 @@ class _MaterialsScreenState extends State<MaterialsScreen>
   }
 
   Widget _buildCatalog() {
-    if (_materials.isEmpty) {
-      return _empty("Siryo yo'q", Icons.science_outlined);
-    }
-    return RefreshIndicator(
-      onRefresh: _loadAll,
-      child: ListView.builder(
-        padding: const EdgeInsets.fromLTRB(12, 12, 12, 80),
-        itemCount: _materials.length,
-        itemBuilder: (ctx, i) {
-          final m = _materials[i];
-          final income = double.tryParse(m['total_income'].toString()) ?? 0;
-          final expense = double.tryParse(m['total_expense'].toString()) ?? 0;
-          final balance = income - expense;
-          return Container(
-            margin: const EdgeInsets.only(bottom: 8),
-            decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12),
-              boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 6)]),
-            child: ListTile(
-              onTap: () => Navigator.push(context, MaterialPageRoute(
-                builder: (_) => MaterialDetailScreen(material: m))),
-              leading: CircleAvatar(
-                backgroundColor: _primary.withValues(alpha: 0.1),
-                child: const Icon(Icons.science, color: _primary)),
-              title: Text(m['name'], style: const TextStyle(fontWeight: FontWeight.bold)),
-              subtitle: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                if ((m['code'] ?? '').toString().isNotEmpty)
-                  Text('Kod: ${m['code']}', style: const TextStyle(fontSize: 12, color: Colors.grey)),
-                Wrap(spacing: 4, runSpacing: 4, children: [
-                  _badge('Kirim: ${income.toStringAsFixed(1)} ${m['unit']}', Colors.green),
-                  _badge('Rasxod: ${expense.toStringAsFixed(1)} ${m['unit']}', Colors.orange),
-                  _badge('Qoldiq: ${balance.toStringAsFixed(1)} ${m['unit']}', balance < 0 ? Colors.red : Colors.blue),
-                ]),
+    final visible = _stockOnly
+        ? _materials.where((m) => _materialBalance(m) > 0).toList()
+        : _materials;
+    return Column(children: [
+      _buildStockFilter(),
+      Expanded(
+        child: _materials.isEmpty
+            ? _empty("Siryo yo'q", Icons.science_outlined)
+            : visible.isEmpty
+                ? _empty("Qoldiqda siryo yo'q", Icons.inventory_2_outlined)
+                : RefreshIndicator(
+                    onRefresh: _loadAll,
+                    child: ListView.builder(
+                      padding: const EdgeInsets.fromLTRB(12, 4, 12, 80),
+                      itemCount: visible.length,
+                      itemBuilder: (ctx, i) => _materialCard(visible[i]),
+                    ),
+                  ),
+      ),
+    ]);
+  }
+
+  double _materialBalance(Map<String, dynamic> m) {
+    final income = double.tryParse(m['total_income'].toString()) ?? 0;
+    final expense = double.tryParse(m['total_expense'].toString()) ?? 0;
+    return income - expense;
+  }
+
+  Widget _buildStockFilter() {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 4),
+      child: Row(children: [
+        ChoiceChip(
+          label: const Text('Hammasi'),
+          selected: !_stockOnly,
+          showCheckmark: false,
+          selectedColor: _primary.withValues(alpha: 0.15),
+          side: BorderSide(color: !_stockOnly ? _primary : Colors.grey.shade300),
+          labelStyle: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: !_stockOnly ? _primary : Colors.black87,
+          ),
+          onSelected: (_) => setState(() => _stockOnly = false),
+        ),
+        const SizedBox(width: 8),
+        ChoiceChip(
+          label: const Text('Qoldiqda bor'),
+          selected: _stockOnly,
+          showCheckmark: false,
+          selectedColor: _primary.withValues(alpha: 0.15),
+          side: BorderSide(color: _stockOnly ? _primary : Colors.grey.shade300),
+          labelStyle: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: _stockOnly ? _primary : Colors.black87,
+          ),
+          onSelected: (_) => setState(() => _stockOnly = true),
+        ),
+      ]),
+    );
+  }
+
+  Widget _materialCard(Map<String, dynamic> m) {
+    final income = double.tryParse(m['total_income'].toString()) ?? 0;
+    final expense = double.tryParse(m['total_expense'].toString()) ?? 0;
+    final balance = income - expense;
+    final inStock = balance > 0;
+    return Opacity(
+      opacity: inStock ? 1 : 0.5,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 8),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 6)],
+        ),
+        child: Stack(children: [
+          ListTile(
+            onTap: () => Navigator.push(context, MaterialPageRoute(
+              builder: (_) => MaterialDetailScreen(material: m))),
+            leading: CircleAvatar(
+              backgroundColor: _primary.withValues(alpha: 0.1),
+              child: const Icon(Icons.science, color: _primary)),
+            title: Row(children: [
+              Expanded(child: Text(m['name'], style: TextStyle(
+                fontWeight: inStock ? FontWeight.bold : FontWeight.w500))),
+              if (inStock)
+                Container(
+                  margin: const EdgeInsets.only(left: 6),
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: Colors.green.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: const Text('Mavjud', style: TextStyle(
+                    fontSize: 9, color: Colors.green, fontWeight: FontWeight.bold)),
+                ),
+            ]),
+            subtitle: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              if ((m['code'] ?? '').toString().isNotEmpty)
+                Text('Kod: ${m['code']}', style: const TextStyle(fontSize: 12, color: Colors.grey)),
+              Wrap(spacing: 4, runSpacing: 4, children: [
+                _badge('Kirim: ${income.toStringAsFixed(1)} ${m['unit']}', Colors.green),
+                _badge('Rasxod: ${expense.toStringAsFixed(1)} ${m['unit']}', Colors.orange),
+                _badge('Qoldiq: ${balance.toStringAsFixed(1)} ${m['unit']}', balance < 0 ? Colors.red : Colors.blue),
               ]),
-              isThreeLine: true,
-              trailing: IconButton(
-                icon: const Icon(Icons.delete_outline, color: Colors.red),
-                onPressed: () async {
-                  try {
-                    await _api.deleteRawMaterial(m['id'] as int);
-                    _loadAll();
-                  } catch (e) { _msg('Xato: $e', err: true); }
-                },
+            ]),
+            isThreeLine: true,
+            trailing: IconButton(
+              icon: const Icon(Icons.delete_outline, color: Colors.red),
+              onPressed: () async {
+                try {
+                  await _api.deleteRawMaterial(m['id'] as int);
+                  _loadAll();
+                } catch (e) { _msg('Xato: $e', err: true); }
+              },
+            ),
+          ),
+          if (inStock)
+            Positioned(
+              left: 0,
+              top: 10,
+              bottom: 10,
+              child: Container(
+                width: 4,
+                decoration: BoxDecoration(
+                  color: Colors.green,
+                  borderRadius: BorderRadius.circular(2),
+                ),
               ),
             ),
-          );
-        },
+        ]),
       ),
     );
   }
@@ -535,40 +625,14 @@ class _MaterialDetailScreenState extends State<MaterialDetailScreen> {
           ]),
         ),
         if (_linkedProducts.isNotEmpty)
-          SizedBox(
-            height: 120,
-            child: ListView.builder(
-              padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
-              scrollDirection: Axis.horizontal,
-              itemCount: _linkedProducts.length,
-              itemBuilder: (ctx, i) {
-                final p = _linkedProducts[i];
-                final active = p['is_active'] == true;
-                return Container(
-                  width: 180,
-                  margin: const EdgeInsets.only(right: 8),
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: active ? Colors.white : Colors.grey[100],
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: active ? Colors.green.withValues(alpha: 0.4) : Colors.grey.withValues(alpha: 0.3)),
-                  ),
-                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Row(children: [
-                      Icon(active ? Icons.check_circle : Icons.pause_circle,
-                          size: 14, color: active ? Colors.green : Colors.grey),
-                      const SizedBox(width: 4),
-                      Expanded(child: Text(p['product_barcode'] ?? '', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold), overflow: TextOverflow.ellipsis)),
-                    ]),
-                    const SizedBox(height: 4),
-                    Text(p['product_name'] ?? "Noma'lum", style: const TextStyle(fontSize: 10, color: Colors.blueGrey), maxLines: 2, overflow: TextOverflow.ellipsis),
-                    const Spacer(),
-                    Text('${p['grams_per_unit']} g/dona', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF1565C0))),
-                    if (p['active_from'] != null)
-                      Text('${_fmtDate(p['active_from'])} dan', style: const TextStyle(fontSize: 9, color: Colors.grey)),
-                  ]),
-                );
-              },
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: _linkedProducts
+                  .map((p) => LinkedProductCard(product: p))
+                  .toList(),
             ),
           ),
         const Divider(height: 1),

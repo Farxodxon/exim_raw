@@ -13,6 +13,8 @@ class _PartnersScreenState extends State<PartnersScreen> {
   final ApiService _api = ApiService();
   static const Color _primary = Color(0xFF1565C0);
   List<PartnerModel> _partners = [];
+  Map<int, int> _orderCounts = {};
+  bool _ordersLoaded = false;
   bool _isLoading = true;
   String? _error;
 
@@ -26,18 +28,48 @@ class _PartnersScreenState extends State<PartnersScreen> {
     setState(() {
       _isLoading = true;
       _error = null;
+      _ordersLoaded = false;
+      _orderCounts = {};
     });
+
+    List<PartnerModel> partners;
     try {
-      final partners = await _api.getPartners();
-      setState(() {
-        _partners = partners;
-        _isLoading = false;
-      });
+      partners = await _api.getPartners();
     } catch (e) {
-      setState(() {
-        _error = e.toString();
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _error = e.toString();
+          _isLoading = false;
+        });
+      }
+      return;
+    }
+
+    if (!mounted) return;
+    setState(() {
+      _partners = partners;
+      _isLoading = false;
+    });
+
+    try {
+      final orders = await _api.getOrders();
+      final counts = <int, int>{};
+      for (final order in orders) {
+        final partnerId = order.partnerId;
+        if (partnerId != null) {
+          counts[partnerId] = (counts[partnerId] ?? 0) + 1;
+        }
+      }
+      if (mounted) {
+        setState(() {
+          _orderCounts = counts;
+          _ordersLoaded = true;
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() => _ordersLoaded = false);
+      }
     }
   }
 
@@ -301,6 +333,28 @@ class _PartnersScreenState extends State<PartnersScreen> {
     }
   }
 
+  Widget _orderCountChip(PartnerModel p) {
+    final text = _ordersLoaded
+        ? 'Buyurtmalar: ${_orderCounts[p.id] ?? 0}'
+        : 'Buyurtmalar: -';
+    return Container(
+      margin: const EdgeInsets.only(top: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+      decoration: BoxDecoration(
+        color: _primary.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Text(
+        text,
+        style: const TextStyle(
+          fontSize: 10,
+          color: _primary,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -356,7 +410,14 @@ class _PartnersScreenState extends State<PartnersScreen> {
                                 child: Icon(Icons.business, color: p.faolligi ? Colors.green.shade700 : Colors.grey),
                               ),
                               title: Text(p.firmaNomi, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
-                              subtitle: Text(subtitleParts.join(' • '), style: const TextStyle(fontSize: 12)),
+                              subtitle: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(subtitleParts.join(' • '), style: const TextStyle(fontSize: 12)),
+                                  _orderCountChip(p),
+                                ],
+                              ),
+                              isThreeLine: true,
                               trailing: Row(mainAxisSize: MainAxisSize.min, children: [
                                 if (!p.faolligi)
                                   Container(
